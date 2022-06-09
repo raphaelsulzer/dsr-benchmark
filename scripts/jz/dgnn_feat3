@@ -1,0 +1,30 @@
+#!/bin/bash
+#SBATCH --job-name=sn3
+#SBATCH --partition=cpu_p1
+#SBATCH --qos=qos_cpu-t3
+#SBATCH --output=ex%j.out
+#SBATCH --error=ex%j.err
+#SBATCH --time=20:00:00
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=1
+#SBATCH --hint=nomultithread #
+#SBATCH --account=mui@cpu
+#
+#
+#
+#
+#
+#
+#
+#
+#
+module purge
+conda deactivate # purging modules inherited by default
+# deactivating environments inherited by default
+module load pytorch-gpu/py3/1.7.1
+conda deactivate
+conda activate /linkhome/rech/genlgm01/uku93eu/.conda/envs/dgnn # loading modules
+set -x
+srun python -u /linkhome/rech/genlgm01/uku93eu/code/python/benchmark/methods/dgnn/feat.py -c 04256520 04379243 04401088 04530566
+# executing script
