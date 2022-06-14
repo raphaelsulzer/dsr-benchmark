@@ -21,44 +21,50 @@ import open3d as o3d
 # models = dataset.getModels(scan=["4"])
 # outpath = "/mnt/raphael/ShapeNet_out/benchmark/poisson/reconbench"
 
+experiment = "reconbench"
+dataset = Berger()
+models = dataset.getModels(type="berger")
+# outpath = "/mnt/raphael/reconbench_out/poisson"
+outpath = "/mnt/raphael/reconbench/p2m/poisson"
 
-depth = [10]
+
+depth = [6]
 boundary = [2]
 
 # 16,0.01000,1.00000
 
 
-os.makedirs(os.path.join(outpath,"ply"),exist_ok=True)
+# os.makedirs(os.path.join(outpath,"ply"),exist_ok=True)
 
 replace = False
 
 for m in tqdm(models,ncols=50):
 
     # if not os.path.isfile(os.path.join(outpath, "..", "ply", m["class"], m["model"] + ".ply")) or replace:
-    scan = np.load(m["scan"])
-    pcd = o3d.geometry.PointCloud()
-
-    # orient normals towards sensor
-    points = scan["points"]
-    normals = scan["normals"]
-    sensor_vec = scan["sensor_position"] - points
-
-    ip = np.einsum('ij,ij->i',normals, sensor_vec)
-    normals[ip<0] = -normals[ip<0]
-
-    normals = normals / np.linalg.norm(normals, axis=1)[:, np.newaxis]
-    pcd.points = o3d.utility.Vector3dVector(points)
-    pcd.normals = o3d.utility.Vector3dVector(normals)
-
-
-    o3d.io.write_point_cloud(m["scan"][:-3]+"ply", pcd)
+    # scan = np.load(m["scan"])
+    # pcd = o3d.geometry.PointCloud()
+    #
+    # # orient normals towards sensor
+    # points = scan["points"]
+    # normals = scan["normals"]
+    # sensor_vec = scan["sensor_position"] - points
+    #
+    # ip = np.einsum('ij,ij->i',normals, sensor_vec)
+    # normals[ip<0] = -normals[ip<0]
+    #
+    # normals = normals / np.linalg.norm(normals, axis=1)[:, np.newaxis]
+    # pcd.points = o3d.utility.Vector3dVector(points)
+    # pcd.normals = o3d.utility.Vector3dVector(normals)
+    #
+    #
+    # o3d.io.write_point_cloud(m["scan"][:-3]+"ply", pcd)
 
     for b in boundary:
         for d in depth:
             try:
                 os.makedirs(os.path.join(outpath,m["class"]), exist_ok=True)
                 command = ["/home/raphael/cpp/PoissonReconOri/Bin/Linux/PoissonRecon",
-                           "--in", m["scan"][:-3]+"ply",
+                           "--in", m["scan_ply"],
                            "--out", os.path.join(outpath,m["class"],m["model"]),
                            "--depth", str(d),
                            "--bType", str(b)]

@@ -70,53 +70,6 @@ class Evaluator:
 
         return eval_df_
 
-    def evalTest(self, models, outpath):
-
-        for m in tqdm(models, ncols=50):
-
-            try:
-
-                # gt_mesh = trimesh.load(m["mesh"], process=False)
-                mesh_file = os.path.join(outpath, m["class"], m["model"] + ".ply")
-                mesh = trimesh.load(mesh_file, process=False)
-                pointcloud = np.load(m["pointcloud"])
-                pointcloud_tgt = pointcloud["points"]
-                normals_tgt = pointcloud["normals"]
-                points = np.load(m["occ"])
-                points_tgt = points['points']
-                occ_tgt = np.unpackbits(points['occupancies'])
-
-                eval_dict_mesh = self.evaluator.eval_mesh(
-                    mesh, pointcloud_tgt, normals_tgt, points_tgt, occ_tgt)
-
-                md = {}
-                md["class"] = m["class"]
-                md["model"] = m["model"]
-                md["iou"] = eval_dict_mesh["iou"]
-                md["chamfer"] = eval_dict_mesh["chamfer-L1"]
-                md["normal"] = eval_dict_mesh["normals"]
-                md["boundary_edges"] = eval_dict_mesh["boundary_edges"]
-                md["non-manifold_edges"] = eval_dict_mesh["non-manifold_edges"]
-                md["watertight"] = eval_dict_mesh["watertight"]
-                md["components"] = eval_dict_mesh["components"]
-                if (not md["watertight"]):
-                    print("{}/{}".format(m["class"], m["model"]))
-
-                self.eval_dicts.append(md)
-
-            except Exception as e:
-                # raise
-                print(e)
-                print("Skipping {}/{}".format(md["class"], md["model"]))
-
-        eval_df = pd.DataFrame(self.eval_dicts)
-        eval_df.to_pickle(os.path.join(outpath, "results_all.pkl"))
-        eval_df_class = eval_df.groupby(by=['class']).mean()
-        eval_df_class.loc['mean'] = eval_df.mean()
-        eval_df_class.to_csv(os.path.join(outpath, "results.csv"))
-
-        return eval_df_class
-
 # dataset = ModelNet10()
 # split = "test"
 # models = dataset.getModels(splits=[split],classes=["bathtub", "bed", "desk", "dresser", "nightstand", "toilet"])[split]

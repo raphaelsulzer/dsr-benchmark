@@ -36,9 +36,12 @@ class Berger:
                         d["scan_ply"] = os.path.join(self.path,"scan_ply",c,s+".ply")
                     elif type == "berger":
                         d["scan"] = os.path.join(self.path,"scan_berger_1",c,s+".npz")
-                        d["scan"] = os.path.join(self.path,"scan_berger_1",c,s+".ply")
+                        d["scan_ply"] = os.path.join(self.path,"scan_berger_1",c,s+".ply")
                     else:
                         print("{} is not a valid scan type".format(type))
+
+                    d["convex_hull"] = os.path.join(self.path,"p2m","convex_hull",s,c+".obj")
+                    d["poisson_6"] = os.path.join(self.path,"p2m","poisson",s,c+".ply")
 
                     d["occ"] = os.path.join(self.path,"eval",c,"points.npz")
                     d["pointcloud"] = os.path.join(self.path,"eval",c,"pointcloud.npz")

@@ -233,13 +233,16 @@ class MeshEvaluator(object):
             try:
 
                 # gt_mesh = trimesh.load(m["mesh"], process=False)
-                if os.path.exists(os.path.join(outpath, m["class"], m["model"]+".ply")):
-                    mesh_file = os.path.join(outpath, m["class"], m["model"]+".ply")
-                else:
-                    mesh_file = os.path.join(outpath, m["class"], m["model"] + ".off")
+                # if os.path.exists(os.path.join(outpath, m["class"], m["model"]+".ply")):
+                #     mesh_file = os.path.join(outpath, m["class"], m["model"]+".ply")
+                # else:
+                #     mesh_file = os.path.join(outpath, m["class"], m["model"] + ".off")
                 # mesh_file = os.path.join(outpath, m["class"], m["model"])
-                # mesh_file = glob.glob(os.path.join(outpath,m["class"],m["model"]+"*"))[0]
-                mesh = trimesh.load(mesh_file, process=False)
+                files = glob.glob(os.path.join(outpath,m["class"],m["model"]+"*"))
+                mesh_files = [file for file in files
+                         if os.path.isfile(file)]
+
+                mesh = trimesh.load(mesh_files[0], process=False)
 
                 if(transform):
                     R = np.array([[-1, 0, 0], [0, 0, 1], [0, 1, 0]], dtype=np.float32)

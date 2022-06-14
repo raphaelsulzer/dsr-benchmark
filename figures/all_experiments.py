@@ -12,53 +12,53 @@ methods = []
 d=dict()
 d["name"] = "ConvONet2D"
 d["path"] = "conv_onet/2d/{}/meshes"
-d["modelnet_shapenet"] = 0.685
+d["modelnet_shapenet"] = 0.683
 methods.append(d)
 
 d=dict()
 d["name"] = "ConvONet3D"
 d["path"] = "conv_onet/3d/{}/meshes"
-d["modelnet_shapenet"] = 0.628
+d["modelnet_shapenet"] = 0.510
 methods.append(d)
 
 d=dict()
 d["name"] = "SAP"
 d["path"] = "sap/tr/{}/meshes"
-d["modelnet_shapenet"] = 0.556
+d["modelnet_shapenet"] = 0.549
 methods.append(d)
 
 d=dict()
 d["name"] = "LIG"
 d["path"] = "lig/{}"
-d["modelnet_shapenet"] = 0.664
+d["modelnet_shapenet"] = 0.616
 methods.append(d)
 
 d=dict()
 d["name"] = "DGNN"
 d["path"] = "dgnn/tr/{}"
-d["modelnet_shapenet"] = 0.844
+d["modelnet_shapenet"] = 0.845
 methods.append(d)
 
 d=dict()
 d["name"] = "POCO"
 d["path"] = "poco/tr/{}/meshes"
-d["modelnet_shapenet"] = 0.391
+d["modelnet_shapenet"] = 0.409
 methods.append(d)
 
 d=dict()
 d["name"] = "SPSR"
 d["path"] = "poisson/{}"
-d["modelnet_shapenet"] = 0.664
+d["modelnet_shapenet"] = 0.741
 methods.append(d)
 
 
 d=dict()
 d["name"] = "Labatut $\it{et~al.}$"
 d["path"] = "labatut/{}"
-d["modelnet_shapenet"] = 0.804
+d["modelnet_shapenet"] = 0.803
 methods.append(d)
 
-colors = sns.color_palette("Set3", len(methods))
+colors = sns.color_palette("Set2", len(methods))
 
 path = "/mnt/raphael/ShapeNet_out/benchmark"
 
@@ -94,6 +94,8 @@ plt.ylabel("Volumetric IoU")
 plt.xlabel("Experiment")
 plt.legend(names)
 plt.xticks([1,2,3,4,5])
+plt.savefig("/mnt/raphael/ShapeNet_out/benchmark/iou_all_figure.png")
+
 plt.show()
 a=4
 

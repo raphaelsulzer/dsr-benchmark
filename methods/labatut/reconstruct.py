@@ -16,21 +16,25 @@ from datasets.berger import Berger
 # models = dataset.getModels(splits=[split],scan="4")[split]
 # outpath = os.path.join("/mnt/raphael/ShapeNet_out/benchmark/labatut/shapenet3000")
 
+# dataset = Berger()
+# models = dataset.getModels(scan=["4"])
+# outpath = "/mnt/raphael/ShapeNet_out/benchmark/labatut/reconbench"
+
 dataset = Berger()
-models = dataset.getModels(scan=["4"])
-outpath = "/mnt/raphael/ShapeNet_out/benchmark/labatut/reconbench"
+models = dataset.getModels(type="berger")
+outpath = "/mnt/raphael/reconbench_out/labatut"
 
 # sigma = [0.01]
 # lam = [1.0]
 # alpha = [16]
 
-
-# sigma = [0.001]
-# lam = [5]
+#### the shapenet experiments are run with this setting:
+# sigma = [0.01]
+# lam = [2.5]
 # alpha = [32]
 
-sigma = [0.01]
-lam = [2.5]
+sigma = [0.001]
+lam = [5]
 alpha = [32]
 
 
