@@ -44,11 +44,12 @@ class Evaluator:
                 md["iou"] = eval_dict_mesh["iou"]
                 md["chamfer"] = eval_dict_mesh["chamfer-L1"]
                 md["normal"] = eval_dict_mesh["normals"]
+                md["components"] = eval_dict_mesh["components"]
                 md["boundary_edges"] = eval_dict_mesh["boundary_edges"]
                 md["non-manifold_edges"] = eval_dict_mesh["non-manifold_edges"]
                 md["watertight"] = eval_dict_mesh["watertight"]
-                if(not md["watertight"]):
-                    print("{}/{}".format(m["class"],m["model"]))
+                if (not md["watertight"]):
+                    print("Non watertight mesh {}/{}".format(m["class"], m["model"]))
 
                 self.eval_dicts.append(md)
 
@@ -72,10 +73,20 @@ class Evaluator:
 # models = dataset.getModels(splits=[split],classes=["bathtub",  "bed",  "desk",  "dresser",  "nightstand",  "toilet"])[split]
 # outpath = "/mnt/raphael/ShapeNet_out/benchmark/dgnn/tr/modelnet"
 
+# dataset = ShapeNet()
+# split = "test100"
+# models = dataset.getModels(splits=[split])[split]
+# outpath = "/mnt/raphael/ShapeNet_out/benchmark/dgnn/tr/shapenet10000"
+
 dataset = ShapeNet()
 split = "test100"
 models = dataset.getModels(splits=[split])[split]
-outpath = "/mnt/raphael/ShapeNet_out/benchmark/dgnn/tr/shapenet10000"
+outpath = "/mnt/raphael/ModelNet10_out/benchmark/dgnn/tr/shapenet"
+
+# dataset = ModelNet10()
+# split = "test"
+# models = dataset.getModels(splits=[split])[split]
+# outpath = "/mnt/raphael/ModelNet10_out/benchmark/dgnn/tr/modelnet"
 
 # dataset = Berger()
 # models = dataset.getModels(scan=["4"])
@@ -83,12 +94,11 @@ outpath = "/mnt/raphael/ShapeNet_out/benchmark/dgnn/tr/shapenet10000"
 
 print("Eval shapes from ",outpath)
 evl = Evaluator()
-# ev_dict = evl.evalTrain()
 ev_dict = evl.eval(models,outpath)
 
 pd.set_option('display.max_columns', None)
 pd.set_option('display.max_rows', None)
-pd.set_option('display.precision',3)
+pd.set_option('display.precision', 3)
 print(ev_dict)
 
 

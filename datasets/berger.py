@@ -5,15 +5,19 @@ import numpy as np
 import trimesh
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 # from libmesh import check_mesh_contains
-
+from tqdm import tqdm
 
 class Berger:
 
-    def __init__(self,path="/mnt/raphael/reconbench", classes=[]):
+    def __init__(self,path="/mnt/raphael/reconbench",
+                 classes=[],
+                 mesh_tools_dir="/home/raphael/cpp/mesh-tools/build/release"
+                 ):
 
         self.path = path
         self.classes = classes
         self.model_dicts = []
+        self.mesh_tools_dir = mesh_tools_dir
 
         if not classes:
             with open(os.path.join(self.path, "classes.lst"), 'r') as f:
@@ -22,23 +26,24 @@ class Berger:
                 categories.remove('')
             self.classes = categories
 
-    def getModels(self,scan=["0","1","2","3","4"],reduce=None,type="mvs"):
+    def getModels(self,scan_conf=["0","1","2","3","4"],reduce=None):
 
-        for s in scan:
+        self.scan_conf = [scan_conf] if isinstance(scan_conf, str) else scan_conf
+
+
+        for s in self.scan_conf:
             for c in self.classes:
 
                     d = {}
                     d["class"] = s
                     d["model"] = c
                     d["scan_conf"] = s
-                    if type == "mvs":
-                        d["scan"] = os.path.join(self.path,"scan",c,s+".npz")
-                        d["scan_ply"] = os.path.join(self.path,"scan_ply",c,s+".ply")
-                    elif type == "berger":
+                    if "mvs" in s:
+                        d["scan"] = os.path.join(self.path,"scan",c,s[3:]+".npz")
+                        d["scan_ply"] = os.path.join(self.path,"scan",c,s[3:]+".ply")
+                    else:
                         d["scan"] = os.path.join(self.path,"scan_berger_1",c,s+".npz")
                         d["scan_ply"] = os.path.join(self.path,"scan_berger_1",c,s+".ply")
-                    else:
-                        print("{} is not a valid scan type".format(type))
 
                     d["convex_hull"] = os.path.join(self.path,"p2m","convex_hull",s,c+".obj")
                     d["poisson_6"] = os.path.join(self.path,"p2m","poisson",s,c+".ply")
@@ -53,7 +58,8 @@ class Berger:
 
 
 
-    def scan(self,scan_setting="4",scanner_dir="/home/raphael/cpp/mesh-tools/build/release/scan"):
+    def scan(self,scan_setting="4",scanner_dir="/home/raphael/cpp/mesh-tools/build/release/scan",
+             normal_method='jet', normal_neighborhood=30, normal_orient=1):
 
         if(len(self.model_dicts) < 1):
             print("\nERROR: run getModels() first!")
@@ -74,10 +80,37 @@ class Berger:
                        "--outliers", scan["outliers"],
                        "--cameras", scan["cameras"],
                        "--normal_method", "jet",
-                       "--export", "all"]
+                       "--export", "all",
+                       "--normal_neighborhood", normal_neighborhood,
+                       "--normal_method", normal_method,
+                       "--normal_orient", normal_orient]
             print(*command)
             p = subprocess.Popen(command)
             p.wait()
+
+
+    def estimNormals(self, method='jet', neighborhood=30, orient=1):
+        if (len(self.model_dicts) < 1):
+            print("\nERROR: run getModels() first!")
+            sys.exit(1)
+
+        for m in tqdm(self.model_dicts, ncols=50):
+            try:
+                command = [str(os.path.join(self.mesh_tools_dir, "normal")),
+                           "-w", str(self.path),
+                           "-s", "npz",
+                           "-i", str(os.path.join("scan", m["model"], self.scan_conf + ".npz")),
+                           "-o", str(os.path.join("scan", m["model"], self.scan_conf)),
+                           "--method", method,
+                           "--neighborhood", str(neighborhood),
+                           "--orient", str(orient),
+                           "--overwrite", "1"]
+                print(*command)
+                p = subprocess.Popen(command)
+                p.wait()
+            except Exception as e:
+                print(e)
+                print("Skipping {}/{}".format(m["class"], m["model"]))
 
     # def sample(self,n_points=100000):
     #

@@ -1,57 +1,9 @@
-import os
+import os, sys
 import seaborn as sns
 import pandas as pd
 
-methods = []
-
-d=dict()
-d["name"] = "ConvONet2D"
-d["cite"] = "\cite{Peng2020}"
-d["path"] = "conv_onet/2d/{}/meshes"
-methods.append(d)
-
-d=dict()
-d["name"] = "ConvONet3D"
-d["cite"] = "\cite{Peng2020}"
-d["path"] = "conv_onet/3d/{}/meshes"
-methods.append(d)
-
-d=dict()
-d["name"] = "SAP"
-d["cite"] = "\cite{Peng2021SAP}"
-d["path"] = "sap/tr/{}/meshes"
-methods.append(d)
-
-# d=dict()
-# d["name"] = "LIG"
-# d["cite"] = "\cite{lig}"
-# d["path"] = "lig/{}"
-# methods.append(d)
-
-d=dict()
-d["name"] = "DGNN"
-d["cite"] = "\cite{dgnn}"
-d["path"] = "dgnn/tr/{}"
-methods.append(d)
-
-d=dict()
-d["name"] = "POCO"
-d["cite"] = "\cite{boulch2022poco}"
-d["path"] = "poco/tr/{}/meshes"
-methods.append(d)
-
-d=dict()
-d["name"] = "SPSR"
-d["cite"] = "\cite{screened_poisson}"
-d["path"] = "poisson/{}"
-methods.append(d)
-
-
-d=dict()
-d["name"] = "Labatut~\etal"
-d["cite"] = "\cite{Labatut2009a}"
-d["path"] = "labatut/{}"
-methods.append(d)
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+from methods.methods import learning_methods as methods
 
 colors = sns.color_palette("Set2", len(methods))
 

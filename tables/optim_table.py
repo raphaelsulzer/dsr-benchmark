@@ -1,52 +1,10 @@
-import os
+import os, sys
 import seaborn as sns
 import pandas as pd
 
-methods = []
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+from methods.methods import optim_methods as methods
 
-d=dict()
-d["name"] = "IGR"
-d["cite"] = "\cite{Gropp2020}"
-d["path"] = "igr"
-methods.append(d)
-
-d=dict()
-d["name"] = "LIG"
-d["cite"] = "\cite{lig}"
-d["path"] = "lig"
-methods.append(d)
-
-d=dict()
-d["name"] = "P2M"
-d["cite"] = "\cite{point2mesh}"
-d["path"] = "p2m/poisson"
-methods.append(d)
-
-d=dict()
-d["name"] = "SAP"
-d["cite"] = "\cite{Peng2021SAP}"
-d["path"] = "sap"
-methods.append(d)
-
-d=dict()
-d["name"] = "DSE"
-d["cite"] = "\cite{rakotosaona2021dse}"
-d["path"] = "dse"
-methods.append(d)
-
-d=dict()
-d["name"] = "SPSR"
-d["cite"] = "\cite{screened_poisson}"
-d["path"] = "poisson"
-methods.append(d)
-
-d=dict()
-d["name"] = "Labatut~\etal"
-d["cite"] = "\cite{Labatut2009a}"
-d["path"] = "labatut"
-methods.append(d)
-
-colors = sns.color_palette("Set2", len(methods))
 
 path = "/mnt/raphael/reconbench_out"
 

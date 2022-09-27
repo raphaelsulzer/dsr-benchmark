@@ -4,7 +4,7 @@ from berger import Berger
 
 
 dataset = Berger()
-dataset.getModels(scan=["0"])
+dataset.getModels(scan_conf=["4"])
 dataset.scan("4")
 # dataset.sample()
 

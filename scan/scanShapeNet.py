@@ -5,8 +5,8 @@ from shapenet import ShapeNet
 
 
 dataset = ShapeNet()
-dataset.getModels(scan=["6"],splits=["test100"])
-dataset.scan("6")
+dataset.getModels(scan_conf="6",splits=["test100"])
+dataset.scan()
 # dataset.sample()
 
 

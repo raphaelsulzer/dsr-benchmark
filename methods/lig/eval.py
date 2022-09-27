@@ -131,15 +131,16 @@ class Evaluator:
 # models = dataset.getModels(splits=[split],classes=["bathtub",  "bed",  "desk",  "dresser",  "nightstand",  "toilet"])[split]
 # outpath = "/mnt/raphael/ShapeNet_out/benchmark/lig/modelnet"
 
-dataset = ShapeNet()
-split = "test100"
-models = dataset.getModels(reduce=0.1,splits=[split],scan="4")[split]
-outpath = "/mnt/raphael/ShapeNet_out/benchmark/lig/shapenet3000"
+# dataset = ShapeNet()
+# split = "test100"
+# models = dataset.getModels(reduce=0.1,splits=[split],scan="4")[split]
+# outpath = "/mnt/raphael/ShapeNet_out/benchmark/lig/shapenet3000"
 
 
-# dataset = Berger()
-# models = dataset.getModels(scan=["4"])
-# outpath = "/mnt/raphael/ShapeNet_out/benchmark/lig/reconbench"
+dataset = Berger()
+models = dataset.getModels(scan_conf=["mvs4"])
+outpath = "/mnt/raphael/ShapeNet_out/benchmark/lig/reconbench"
+# outpath = "/mnt/raphael/reconbench_out/benchmark/lig/reconbench"
 
 
 print("Eval shapes from ",outpath)

@@ -1,4 +1,6 @@
 import os, sys, subprocess, shutil
+import time
+
 from tqdm import tqdm
 sys.path.append(os.path.join(os.path.dirname(__file__),"..","..","datasets"))
 from modelnet10 import ModelNet10
@@ -54,11 +56,13 @@ def runShapeNet(args):
                            "-w", str(os.path.join(args.path,m["class"],m["model"])),
                            "-i", "scan/"+args.scan,
                            "-o", args.scan,
-                           "-g", "mesh/mesh.off",
+                           # "-g", "mesh/mesh.off",
                            "-s", "npz",
                            "-e",""]
-                print(*command)
-                p = subprocess.Popen(command)
+                # print(*command)
+                # p = subprocess.Popen(command)
+                p = subprocess.Popen(command, shell=False,
+                                     stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
                 p.wait()
 
             except Exception as e:
@@ -104,7 +108,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='Train SurfaceNet')
 
-    parser.add_argument('-d', '--dataset', type=str, default='reconbench',
+    parser.add_argument('-d', '--dataset', type=str, default='shapenet',
                         help='which dataset')
     parser.add_argument('-c', '--classes', type=str,  nargs='+', default=[],
                         help='which classes')
@@ -133,13 +137,18 @@ if __name__ == "__main__":
         # '04256520','04379243','04401088','04530566']
 
         dataset = ShapeNet(path=args.path)
-        models = dataset.getModels(splits=["test100"])
+        models = dataset.getModels(splits=["test10"])
 
         args.dataset = dataset
         args.models = models
 
-
+        t0 = time.time()
         runShapeNet(args)
+
+        tt = time.time() - t0
+        print("models: ", len(models))
+        print("full time: ", tt)
+        print("average time: ", tt / len(models))
 
     elif args.dataset == 'modelnet':
 
