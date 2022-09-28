@@ -5,7 +5,6 @@ import numpy as np
 
 sure_dir = "/home/adminlocal/PhD/cpp/mesh-tools/build/release"
 
-path = "/home/adminlocal/PhD/data/benchmark/scan_example/unit"
 # mesh = os.path.join(path,"mesh.off")
 # mesh = trimesh.load(mesh)
 stddev = 0.0025
@@ -25,21 +24,7 @@ stddev = 0.0025
 # print(*command)
 # p = subprocess.Popen(command)
 # p.wait()
-def uniform_sampling(mesh,stddev):
-    n=250000
-    uniform_points = mesh.sample(n)
-    noise = stddev * np.random.randn(*uniform_points.shape)
-    pcd = o3d.geometry.PointCloud()
-    pcd.points = o3d.utility.Vector3dVector(uniform_points+noise)
-    o3d.io.write_point_cloud(os.path.join(path,"uniform_"+str(n)+".ply"),pcd)
 
-    command = [sure_dir+"/normal",
-               "-w", path,
-               "-i", "uniform_"+str(n)+".ply",
-               "--neighborhood", "30"]
-    print(*command)
-    p = subprocess.Popen(command)
-    p.wait()
 
 ## scan
 # cams = 5
@@ -58,23 +43,7 @@ def uniform_sampling(mesh,stddev):
 # p = subprocess.Popen(command)
 # p.wait()
 
-cams=5
-n=250000
-command = [sure_dir+"/scan",
-           "-w", path,
-           "-i", "mesh.off",
-           "-o", "scan_"+str(n),
-           "--cameras", str(cams),
-           "--points", str(n),
-           "--noise", str(stddev),
-           # "--normal_method", "jet",
-           # "--normal_neighborhood", "30",
-           "--export", "all",
-           "-e","v"]
-# TODO: export this scan with sensors as normal field
-print(*command)
-p = subprocess.Popen(command)
-p.wait()
+
 
 # lidar.ply is Ignatius02.ply lidar scan with the following sensor coords:
 # -1.851682 -1.862650 -5.837185
@@ -128,6 +97,83 @@ p.wait()
 #     p.close()
 #
 #     a=5
+
+class Ignatius:
+
+    def __init__(self):
+        # self.path = "/home/adminlocal/PhD/PhD-Thesis-Harvard/python/scanning/data/bunny"
+        # self.path = "/home/adminlocal/PhD/data/benchmark/Ignatius/"
+
+        self.path = "/Users/mba222/PhD/data/Ignatius"
+
+    def uniform_sampling(mesh,stddev):
+        n=250000
+        uniform_points = mesh.sample(n)
+        noise = stddev * np.random.randn(*uniform_points.shape)
+        pcd = o3d.geometry.PointCloud()
+        pcd.points = o3d.utility.Vector3dVector(uniform_points+noise)
+        o3d.io.write_point_cloud(os.path.join(path,"uniform_"+str(n)+".ply"),pcd)
+
+        command = [sure_dir+"/normal",
+                   "-w", path,
+                   "-i", "uniform_"+str(n)+".ply",
+                   "--neighborhood", "30"]
+        print(*command)
+        p = subprocess.Popen(command)
+        p.wait()
+
+    def orientMVS(self):
+
+        import open3d as o3d
+
+        pc=o3d.io.read_point_cloud(os.path.join(self.path,"mvs_sensor.ply"))
+
+        trans=np.loadtxt(os.path.join(self.path,"Ignatius","Ignatius_trans.txt"))
+
+        pc=pc.transform(trans)
+
+        trans = np.eye(4,4)
+        trans[0,3]=-0.2
+        trans[1,3]=-0.03
+        trans[2,3]=0.03
+
+        pc=pc.transform(trans)
+
+
+        o3d.io.write_point_cloud(os.path.join(self.path,"mvs_sensor_trans.ply"),pc)
+
+
+        a=5
+
+    def scanMVS(self):
+        cams=5
+        n=250000
+        command = [sure_dir+"/scan",
+                   "-w", path,
+                   "-i", "mesh.off",
+                   "-o", "scan_"+str(n),
+                   "--cameras", str(cams),
+                   "--points", str(n),
+                   "--noise", str(stddev),
+                   # "--normal_method", "jet",
+                   # "--normal_neighborhood", "30",
+                   "--export", "all",
+                   "-e","v"]
+        # TODO: export this scan with sensors as normal field
+        print(*command)
+        p = subprocess.Popen(command)
+        p.wait()
+
+
+if __name__ == "__main__":
+
+    ign = Ignatius()
+
+    ign.orientMVS()
+
+
+
+
 
 
 
