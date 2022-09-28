@@ -74,7 +74,8 @@ font = {'family' : 'normal',
 
 matplotlib.rc('font', **font)
 
-plt.figure(figsize=(12,7))
+fig=plt.figure(figsize=(15,7))
+ax = fig.add_subplot(1,1,1)
 names = []
 
 for i,m in enumerate(methods):
@@ -97,13 +98,30 @@ for i,m in enumerate(methods):
         df = pd.read_csv(rfile)
         ious.append(df.iloc[-1]["iou"])
 
-    plt.plot(np.arange(len(experiments))+1,ious,color=colors[i],marker='s',markersize=11)
+    # plt.plot(np.arange(len(experiments))+1,ious,color=colors[i],marker='s',markersize=11)
+    space_between_experiments=3
+    ax.bar(np.arange(len(experiments))*
+           (len(experiments)+space_between_experiments)+i,ious,width=0.9)
+    # plt.plot(np.arange(len(experiments))+1,ious,color=colors[i],marker='s',markersize=11)
+
+
 
 
 plt.ylabel("Volumetric IoU")
 plt.xlabel("Experiment")
-plt.legend(names,loc=1, bbox_to_anchor=(0.9,0.5))
-plt.xticks([1,2,3,4,5])
+plt.xticks([3,11,19,27,35],[1,2,3,4,5])
+
+# plt.legend(names,loc=1, bbox_to_anchor=(1.5,0.5))
+
+box = ax.get_position()
+ax.set_position([box.x0, box.y0 + box.height * 0.1,
+                 box.width, box.height * 0.9])
+
+# Put a legend below current axis
+ax.legend(names,loc='upper center', bbox_to_anchor=(0.5, -0.15),
+          fancybox=True, shadow=True, ncol=7)
+
+
 plt.savefig("/mnt/raphael/ShapeNet_out/benchmark/iou_all_figure.png")
 
 plt.show()

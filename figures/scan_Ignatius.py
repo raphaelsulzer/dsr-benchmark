@@ -106,16 +106,16 @@ class Ignatius:
 
         self.path = "/Users/mba222/PhD/data/Ignatius"
 
-    def uniform_sampling(mesh,stddev):
+    def uniform_sampling(self,mesh,stddev):
         n=250000
         uniform_points = mesh.sample(n)
         noise = stddev * np.random.randn(*uniform_points.shape)
         pcd = o3d.geometry.PointCloud()
         pcd.points = o3d.utility.Vector3dVector(uniform_points+noise)
-        o3d.io.write_point_cloud(os.path.join(path,"uniform_"+str(n)+".ply"),pcd)
+        o3d.io.write_point_cloud(os.path.join(self.path,"uniform_"+str(n)+".ply"),pcd)
 
         command = [sure_dir+"/normal",
-                   "-w", path,
+                   "-w", self.path,
                    "-i", "uniform_"+str(n)+".ply",
                    "--neighborhood", "30"]
         print(*command)
@@ -149,7 +149,7 @@ class Ignatius:
         cams=5
         n=250000
         command = [sure_dir+"/scan",
-                   "-w", path,
+                   "-w", self.path,
                    "-i", "mesh.off",
                    "-o", "scan_"+str(n),
                    "--cameras", str(cams),
