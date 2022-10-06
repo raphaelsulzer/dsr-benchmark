@@ -57,7 +57,6 @@ def plot_model_o3d(method,setview):
 
     vis = o3d.visualization.Visualizer()
     vis.create_window(width=600,height=600, visible=True)
-    # vis.create_window()
 
     if method["name"] == "input":
         # return

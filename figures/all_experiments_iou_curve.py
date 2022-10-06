@@ -60,7 +60,9 @@ from methods.methods import learning_methods as methods
 # methods.append(d)
 
 
-colors = sns.color_palette("Set2", len(methods))
+# colors = sns.color_palette("Set2", len(methods))
+
+colors = ["#ccece6","#66c2a4","#238b45","#005824","#f03b20","#d0d1e6","#034e7b"]
 
 spath = "/mnt/raphael/ShapeNet_out/benchmark"
 mpath = "/mnt/raphael/ModelNet10_out/benchmark"
@@ -70,11 +72,11 @@ experiments = ["shapenet3000","shapenet10000","modelnet","reconbench","shapenet"
 
 font = {'family' : 'normal',
         # 'weight' : 'bold',
-        'size'   : 16}
+        'size'   : 20}
 
 matplotlib.rc('font', **font)
 
-fig=plt.figure(figsize=(15,7))
+fig=plt.figure(figsize=(15,8))
 ax = fig.add_subplot(1,1,1)
 names = []
 
@@ -101,7 +103,7 @@ for i,m in enumerate(methods):
     # plt.plot(np.arange(len(experiments))+1,ious,color=colors[i],marker='s',markersize=11)
     space_between_experiments=3
     ax.bar(np.arange(len(experiments))*
-           (len(experiments)+space_between_experiments)+i,ious,width=0.9)
+           (len(experiments)+space_between_experiments)+i,ious,width=0.9,color=colors[i])
     # plt.plot(np.arange(len(experiments))+1,ious,color=colors[i],marker='s',markersize=11)
 
 
@@ -114,15 +116,18 @@ plt.xticks([3,11,19,27,35],[1,2,3,4,5])
 # plt.legend(names,loc=1, bbox_to_anchor=(1.5,0.5))
 
 box = ax.get_position()
-ax.set_position([box.x0, box.y0 + box.height * 0.1,
-                 box.width, box.height * 0.9])
+# ax.set_position([box.x0, box.y0 + box.height * 0.1,
+#                  box.width, box.height * 0.9])
+
+ax.set_position([box.x0, box.y0,
+                 box.width, box.height * 0.8])
 
 # Put a legend below current axis
-ax.legend(names,loc='upper center', bbox_to_anchor=(0.5, -0.15),
-          fancybox=True, shadow=True, ncol=7)
+ax.legend(names,loc='upper center', bbox_to_anchor=(0.5, 1.3),
+          fancybox=True, shadow=True, ncol=5)
 
 
-plt.savefig("/mnt/raphael/ShapeNet_out/benchmark/iou_all_figure.png")
+plt.savefig("/mnt/raphael/ShapeNet_out/benchmark/all_experiments_barplot_presentation.png")
 
 plt.show()
 a=4

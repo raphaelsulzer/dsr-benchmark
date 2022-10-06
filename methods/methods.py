@@ -28,17 +28,19 @@ learning_methods.append(d)
 # d["path"] = "lig/{}"
 # learning_methods.append(d)
 
-d=dict()
-d["name"] = "DGNN"
-d["cite"] = "\cite{dgnn}"
-d["path"] = "dgnn/tr/{}"
-d["out_type"] = ".ply"
-learning_methods.append(d)
+
 
 d=dict()
 d["name"] = "POCO"
 d["cite"] = "\cite{boulch2022poco}"
 d["path"] = "poco/tr/{}/meshes"
+d["out_type"] = ".ply"
+learning_methods.append(d)
+
+d=dict()
+d["name"] = "DGNN"
+d["cite"] = "\cite{dgnn}"
+d["path"] = "dgnn/tr/{}"
 d["out_type"] = ".ply"
 learning_methods.append(d)
 

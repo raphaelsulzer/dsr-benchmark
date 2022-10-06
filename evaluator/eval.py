@@ -274,7 +274,7 @@ class MeshEvaluator(object):
                 self.eval_dicts.append(md)
 
             except Exception as e:
-                # raise
+                raise
                 print(e)
                 print("Skipping {}/{}".format(m["class"], m["model"]))
 

@@ -56,7 +56,7 @@ def runShapeNet(args):
                            "-w", str(os.path.join(args.path,m["class"],m["model"])),
                            "-i", "scan/"+args.scan,
                            "-o", args.scan,
-                           # "-g", "mesh/mesh.off",
+                           "-g", "mesh/mesh.off",
                            "-s", "npz",
                            "-e",""]
                 # print(*command)
@@ -137,7 +137,7 @@ if __name__ == "__main__":
         # '04256520','04379243','04401088','04530566']
 
         dataset = ShapeNet(path=args.path)
-        models = dataset.getModels(splits=["test10"])
+        models = dataset.getModels(splits=["test100"])
 
         args.dataset = dataset
         args.models = models

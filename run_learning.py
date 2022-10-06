@@ -11,21 +11,21 @@ import pandas as pd
 
 methods = []
 
-d=dict()
-d["name"] = "ConvONet-2D~\cite{Peng2020}"
-d["path"] = "conv_onet/2d/{}/meshes"
-methods.append(d)
-
-d=dict()
-d["name"] = "ConvONet-3D~\cite{Peng2020}"
-d["path"] = "conv_onet/3d/{}/meshes"
-methods.append(d)
-
-d=dict()
-d["name"] = "Shape~As~Points~\cite{Peng2021SAP}"
-d["path"] = "sap/tr/{}/meshes"
-d["modelnet_shapenet"] = 0.556
-methods.append(d)
+# d=dict()
+# d["name"] = "ConvONet-2D~\cite{Peng2020}"
+# d["path"] = "conv_onet/2d/{}/meshes"
+# methods.append(d)
+#
+# d=dict()
+# d["name"] = "ConvONet-3D~\cite{Peng2020}"
+# d["path"] = "conv_onet/3d/{}/meshes"
+# methods.append(d)
+#
+# d=dict()
+# d["name"] = "Shape~As~Points~\cite{Peng2021SAP}"
+# d["path"] = "sap/tr/{}/meshes"
+# d["modelnet_shapenet"] = 0.556
+# methods.append(d)
 
 # d=dict()
 # d["name"] = "LIG~\cite{lig}"
@@ -38,10 +38,10 @@ d["name"] = "DGNN~\cite{dgnn}"
 d["path"] = "dgnn/tr/{}"
 methods.append(d)
 
-d=dict()
-d["name"] = "POCO~\cite{boulch2022poco}"
-d["path"] = "poco/tr/{}/meshes"
-methods.append(d)
+# d=dict()
+# d["name"] = "POCO~\cite{boulch2022poco}"
+# d["path"] = "poco/tr/{}/meshes"
+# methods.append(d)
 
 # d=dict()
 # d["name"] = "SPSR~\cite{screened_poisson}"
@@ -60,6 +60,12 @@ methods.append(d)
 # split = "test"
 # models = dataset.getModels(splits=[split],classes=["bathtub",  "bed",  "desk",  "dresser",  "nightstand",  "toilet"])[split]
 
+experiment = "modelnet"
+dataset = ModelNet10()
+split = "test"
+models = dataset.getModels(splits=[split])[split]
+
+
 # experiment = "shapenet3000"
 # dataset = ShapeNet()
 # split = "test100"
@@ -70,10 +76,10 @@ methods.append(d)
 # split = "test100"
 # models = dataset.getModels(splits=[split],scan='6')[split]
 
-experiment = "shapenet"
-dataset = ShapeNet()
-split = "test100"
-models = dataset.getModels(splits=[split],scan='4')[split]
+# experiment = "shapenet"
+# dataset = ShapeNet()
+# split = "test100"
+# models = dataset.getModels(splits=[split],scan='4')[split]
 
 
 
@@ -83,12 +89,16 @@ models = dataset.getModels(splits=[split],scan='4')[split]
 
 results_all = []
 
+data_path = "/mnt/raphael/ModelNet10_out"
+# data_path = os.path.join(data_path,"benchmark")
+data_path = os.path.join(data_path,"dgnn","ablation")
 
 for m in methods:
     transform=False
     print(m["name"])
     evaluator = MeshEvaluator(n_points=100000)
-    outpath = os.path.join("/mnt/raphael/ModelNet10_out/benchmark",m["path"].format(experiment))
+    # outpath = os.path.join(data_path,m["path"].format(experiment))
+    outpath = os.path.join(data_path,"baseline","modelnet")
     if(m["name"] != "DGNN~\cite{dgnn}"):
         transform = True
     res_dict = evaluator.eval(models,outpath,transform)
@@ -103,6 +113,6 @@ pd.set_option('display.precision', 3)
 print(eval_df)
 
 eval_df.drop(labels='watertight',axis=1, inplace=True)
-eval_df.to_csv(os.path.join("/mnt/raphael/ModelNet10_out/benchmark", experiment+"_all.csv"),sep='&',float_format='%.3g',line_terminator='\\\\\n')
+eval_df.to_csv(os.path.join(data_path, experiment+"_all.csv"),sep='&',float_format='%.3g',line_terminator='\\\\\n')
 
 

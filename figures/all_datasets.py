@@ -44,8 +44,6 @@ for fol in folders:
         data = data.computeNormals().phong()
         image_file = os.path.join(img_path, fol+"_"+f + ".png")
 
-
-
         light = light_dict[dataset]
 
         p2 = vedo.Point(light, c='y')
