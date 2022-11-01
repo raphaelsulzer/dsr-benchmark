@@ -8,20 +8,20 @@ from datasets.berger import Berger
 import open3d as o3d
 import time
 
-# dataset = ModelNet10()
-# split = "test"
-# models = dataset.getModels(splits=[split],classes=["bathtub", "bed", "desk", "dresser", "nightstand", "toilet"])[split]
-# outpath = "/mnt/raphael/ShapeNet_out/benchmark/poisson/modelnet"
+dataset = ModelNet10()
+split = "test"
+models = dataset.getModels(splits=[split],classes=["bathtub", "bed", "desk", "dresser", "nightstand", "toilet"])[split]
+outpath = "/mnt/raphael/ModelNet10_out/benchmark/poisson/modelnet"
 
 # dataset = ShapeNet()
 # split = "test100"
 # models = dataset.getModels(splits=[split], scan="6")[split]
 # outpath = "/mnt/raphael/ShapeNet_out/benchmark/poisson/shapenet10000"
 
-dataset = ShapeNet()
-split = "test10"
-models = dataset.getModels(splits=[split], scan_conf="4")[split]
-outpath = "/mnt/raphael/ShapeNet_out/benchmark/poisson/shapenet3000"
+# dataset = ShapeNet()
+# split = "test10"
+# models = dataset.getModels(splits=[split], scan_conf="4")[split]
+# outpath = "/mnt/raphael/ShapeNet_out/benchmark/poisson/shapenet3000"
 
 # dataset = ShapeNet()
 # split = "test100"
