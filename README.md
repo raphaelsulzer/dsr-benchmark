@@ -1,2 +1,3 @@
-# dsr-benchmark
-A survey and benchmark for (deep) surface reconstruction from point clouds
+# A Survey and Benchmark for (Deep) Surface Reconstruction from Point Clouds
+
+Data and evaluation code for the paper 
