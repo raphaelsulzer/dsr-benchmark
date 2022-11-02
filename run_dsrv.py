@@ -11,33 +11,27 @@ import pandas as pd
 
 methods = []
 
-d=dict()
-d["name"] = "ConvONet-2D~\cite{Peng2020}"
-d["path"] = "conv_onet/2dAP/{}/meshes"
-methods.append(d)
-
-d=dict()
-d["name"] = "ConvONet-3D~\cite{Peng2020}"
-d["path"] = "conv_onet/3dAP/{}/meshes"
-methods.append(d)
-
 # d=dict()
-# d["name"] = "ConvONet-3D~\cite{Peng2020}"
-# d["path"] = "conv_onet/3d/{}/meshes"
+# d["name"] = "ConvONet-2D~\cite{Peng2020}"
+# d["path"] = "conv_onet/2dAP/{}/meshes"
 # methods.append(d)
 #
-d=dict()
-d["name"] = "Shape~As~Points~\cite{Peng2021SAP}"
-d["path"] = "sap/tr/{}/meshes"
-d["modelnet_shapenet"] = 0.556
-methods.append(d)
+# d=dict()
+# d["name"] = "ConvONet-3D~\cite{Peng2020}"
+# d["path"] = "conv_onet/3dAP/{}/meshes"
+# methods.append(d)
+#
+# d=dict()
+# d["name"] = "Shape~As~Points~\cite{Peng2021SAP}"
+# d["path"] = "sap/AP/{}/meshes"
+# methods.append(d)
 
 # d=dict()
 # d["name"] = "LIG~\cite{lig}"
 # d["path"] = "lig/{}"
 # d["modelnet_shapenet"] = 0.664
 # methods.append(d)
-
+#
 # d=dict()
 # d["name"] = "DGNN~\cite{dgnn}"
 # d["path"] = "dgnn/tr/{}"
@@ -45,8 +39,18 @@ methods.append(d)
 
 # d=dict()
 # d["name"] = "POCO~\cite{boulch2022poco}"
-# d["path"] = "poco/tr/{}/meshes"
+# d["path"] = "poco/aux/gen_ShapeNetViewpoints_test100_3000/meshes/raphael/ShapeNet"
 # methods.append(d)
+#
+# d=dict()
+# d["name"] = "P2S~\cite{points2surf}"
+# d["path"] = "p2s/shapenet/aux_global/rec/mesh"
+# methods.append(d)
+
+d=dict()
+d["name"] = "P2S~\cite{points2surf}"
+d["path"] = "p2s/shapenet/conventional/rec/mesh"
+methods.append(d)
 
 # d=dict()
 # d["name"] = "SPSR~\cite{screened_poisson}"
@@ -105,9 +109,9 @@ for m in methods:
     evaluator = MeshEvaluator(n_points=100000)
     outpath = os.path.join(data_path,m["path"].format(experiment))
     # outpath = os.path.join(data_path,"baseline","modelnet")
-    if(m["name"] != "DGNN~\cite{dgnn}"):
+    if(m["name"] not in ["DGNN~\cite{dgnn}","P2S~\cite{points2surf}"]):
         transform = True
-    res_dict = evaluator.eval(models,outpath,transform)
+    res_dict = evaluator.eval(models,outpath,transform,method=m["name"])
     results_all.append(res_dict.loc["mean"].rename(m["name"]))
 
 

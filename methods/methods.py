@@ -2,14 +2,14 @@
 learning_methods = []
 
 d=dict()
-d["name"] = "ConvONet2D"
+d["name"] = "CONet2D"
 d["cite"] = "\cite{Peng2020}"
 d["path"] = "conv_onet/2d/{}/meshes"
 d["out_type"] = ".off"
 learning_methods.append(d)
 
 d=dict()
-d["name"] = "ConvONet3D"
+d["name"] = "CONet3D"
 d["cite"] = "\cite{Peng2020}"
 d["path"] = "conv_onet/3d/{}/meshes"
 d["out_type"] = ".off"

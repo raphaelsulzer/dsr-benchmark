@@ -8,15 +8,15 @@ from datasets.modelnet10 import ModelNet10
 from datasets.shapenet import ShapeNet
 from datasets.berger import Berger
 
-# dataset = ModelNet10()
-# split = "test"
-# models = dataset.getModels(splits=[split],classes=["bathtub", "bed", "desk", "dresser", "nightstand", "toilet"])[split]
-# outpath = "/mnt/raphael/ShapeNet_out/benchmark/labatut/modelnet"
+dataset = ModelNet10()
+split = "test"
+models = dataset.getModels(splits=[split],classes=["bathtub", "bed", "desk", "dresser", "nightstand", "toilet"])[split]
+outpath = "/mnt/raphael/ModelNet10_out/benchmark/labatut/modelnet"
 
-dataset = ShapeNet()
-split = "test10"
-models = dataset.getModels(splits=[split],scan_conf="4")[split]
-outpath = os.path.join("/mnt/raphael/ShapeNet_out/benchmark/labatut/shapenet3000")
+# dataset = ShapeNet()
+# split = "test10"
+# models = dataset.getModels(splits=[split],scan_conf="4")[split]
+# outpath = os.path.join("/mnt/raphael/ShapeNet_out/benchmark/labatut/shapenet3000")
 
 # dataset = Berger()
 # models = dataset.getModels(scan=["4"])

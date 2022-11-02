@@ -226,7 +226,7 @@ class MeshEvaluator(object):
         return out_dict
 
 
-    def eval(self, models, outpath, transform=False):
+    def eval(self, models, outpath, transform=False, method=""):
 
         for m in tqdm(models, ncols=50):
 
@@ -238,7 +238,12 @@ class MeshEvaluator(object):
                 # else:
                 #     mesh_file = os.path.join(outpath, m["class"], m["model"] + ".off")
                 # mesh_file = os.path.join(outpath, m["class"], m["model"])
-                files = glob.glob(os.path.join(outpath,m["class"],m["model"]+"*"))
+                if method == "POCO~\cite{boulch2022poco}":
+                    files = glob.glob(os.path.join(outpath,m["model"]+"*"))
+                elif method == "P2S~\cite{points2surf}":
+                    files = glob.glob(os.path.join(outpath, m["class"]+"_"+m["model"] + "*"))
+                else:
+                    files = glob.glob(os.path.join(outpath,m["class"],m["model"]+"*"))
                 mesh_files = [file for file in files
                          if os.path.isfile(file)]
 

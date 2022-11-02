@@ -69,15 +69,15 @@ class Evaluator:
 
 
 
-dataset = ModelNet10()
-split = "test"
-models = dataset.getModels(splits=[split],classes=["bathtub",  "bed",  "desk",  "dresser",  "nightstand",  "toilet"])[split]
-outpath = "/mnt/raphael/ShapeNet_out/benchmark/conv_onet/3d/modelnet/meshes"
+# dataset = ModelNet10()
+# split = "test"
+# models = dataset.getModels(splits=[split],classes=["bathtub",  "bed",  "desk",  "dresser",  "nightstand",  "toilet"])[split]
+# outpath = "/mnt/raphael/ShapeNet_out/benchmark/conv_onet/3d/modelnet/meshes"
 
-# dataset = ShapeNet()
-# split = "test100"
-# models = dataset.getModels(splits=[split])[split]
-# outpath = "/mnt/raphael/ShapeNet_out/benchmark/conv_onet/3d/shapenet10000/meshes"
+dataset = ShapeNet()
+split = "test100"
+models = dataset.getModels(splits=[split])[split]
+outpath = "/mnt/raphael/ModelNet10_out/dsrv/conv_onet/2dAP/shapenet/meshes"
 
 # dataset = Berger()
 # models = dataset.getModels(scan=["4"])
