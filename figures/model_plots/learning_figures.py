@@ -1,5 +1,5 @@
 import sys, os, subprocess
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
 from methods.methods import learning_methods
 import vedo
 import numpy as np

@@ -7,15 +7,16 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 # from libmesh import check_mesh_contains
 from tqdm import tqdm
 
+
 class Berger:
 
     def __init__(self,path="/mnt/raphael/reconbench",
                  classes=[],
                  mesh_tools_dir="/home/raphael/cpp/mesh-tools/build/release"
                  ):
-
         self.path = path
-        self.classes = classes
+        self.classes = classes if isinstance(classes,list) else [classes]
+
         self.model_dicts = []
         self.mesh_tools_dir = mesh_tools_dir
 
@@ -26,7 +27,7 @@ class Berger:
                 categories.remove('')
             self.classes = categories
 
-    def getModels(self,scan_conf=["0","1","2","3","4"],reduce=None):
+    def getModels(self,scan_conf=["0","1","2","3","4"],reduce=None,ksr_k=1,abspy_k=1):
 
         self.scan_conf = [scan_conf] if isinstance(scan_conf, str) else scan_conf
 
@@ -50,8 +51,21 @@ class Berger:
 
                     d["occ"] = os.path.join(self.path,"eval",c,"points.npz")
                     d["pointcloud"] = os.path.join(self.path,"eval",c,"pointcloud.npz")
+                    d["scan_normal"] = os.path.join(self.path,"scan_ply","with_normals",c+"_"+s+".ply")
 
-                    d["mesh"] = os.path.join(self.path,"mesh","1",c+".off")
+                    d["mesh"] = os.path.join(self.path,"mesh",c+"_light.off")
+
+                    d["planes"] = os.path.join(self.path,"planes",c,s,"planes.vg")
+
+                    d["ksr"] = {}
+                    d["ksr"]["surface"] = os.path.join(self.path,"ksr",'{}',c,s,"surface.off").format(ksr_k)
+                    d["ksr"]["partition"] = os.path.join(self.path,"ksr",'{}',c,s,"partition.kgraph").format(ksr_k)
+
+                    d["abspy"] = {}
+                    d["abspy"]["surface"] = os.path.join(self.path,"abspy",'{}',c,s,"surface.off").format(abspy_k)
+                    d["abspy"]["partition"] = os.path.join(self.path,"abspy",'{}',c,s,"partition.obj").format(abspy_k)
+
+
                     self.model_dicts.append(d)
 
         return self.model_dicts

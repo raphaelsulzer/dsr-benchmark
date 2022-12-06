@@ -1,4 +1,4 @@
-import argparse, subprocess, os
+import subprocess, os
 import configparser
 from munch import Munch
 
@@ -91,6 +91,12 @@ def scanShape(args):
     print(*command)
     subprocess.check_call(command)
 
+import sys
+sys.path.append("/home/rsulzer/python/ksr-benchmark/")
+from importTest import testvar
+print(testvar)
+
+from tqdm import tqdm
 
 args = Munch()
 args.working_dir = "/home/adminlocal/PhD/data/benchmark/scan_example"

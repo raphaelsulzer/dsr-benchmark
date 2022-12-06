@@ -78,6 +78,8 @@ matplotlib.rc('font', **font)
 
 fig=plt.figure(figsize=(15,8))
 ax = fig.add_subplot(1,1,1)
+
+
 names = []
 
 for i,m in enumerate(methods):

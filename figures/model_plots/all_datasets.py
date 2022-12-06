@@ -2,7 +2,7 @@ import numpy as np
 import os, sys, subprocess, trimesh
 import pandas as pd
 from tqdm import tqdm
-sys.path.append(os.path.join(os.path.dirname(__file__),"..","datasets"))
+sys.path.append(os.path.join(os.path.dirname(__file__), "../..", "datasets"))
 from modelnet10 import ModelNet10
 from shapenet import ShapeNet
 from berger import Berger

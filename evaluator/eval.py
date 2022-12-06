@@ -71,7 +71,6 @@ class MeshEvaluator(object):
 
     def __init__(self, n_points=100000):
         self.n_points = n_points
-        self.eval_dicts = []
 
     def eval_mesh(self, mesh, pointcloud_tgt, normals_tgt,
                   points_iou, occ_tgt, remove_wall=False):
@@ -203,10 +202,10 @@ class MeshEvaluator(object):
         chamferL1 = 0.5 * (completeness + accuracy)
 
         # F-Score
-        F = [
-            2 * precision[i] * recall[i] / (precision[i] + recall[i])
-            for i in range(len(precision))
-        ]
+        # F = [
+        #     2 * precision[i] * recall[i] / (precision[i] + recall[i])
+        #     for i in range(len(precision))
+        # ]
 
         out_dict = {
             'completeness': completeness,
@@ -218,15 +217,31 @@ class MeshEvaluator(object):
             'accuracy2': accuracy2,
             'chamfer-L2': chamferL2,
             'chamfer-L1': chamferL1 * 100,
-            'f-score': F[9],  # threshold = 1.0%
-            'f-score-15': F[14],  # threshold = 1.5%
-            'f-score-20': F[19],  # threshold = 2.0%
+            # 'f-score': F[9],  # threshold = 1.0%
+            # 'f-score-15': F[14],  # threshold = 1.5%
+            # 'f-score-20': F[19],  # threshold = 2.0%
         }
 
         return out_dict
 
+    def offFacets(self,filename):
+        with open(filename, 'r') as f:
+            f.readline()
+            return int(f.readline().split()[1])
+
+    def kgrapchAndObjCells(self,filename):
+        with open(filename, 'r') as f:
+            return int(f.readline().split()[-1])
+
+    def getComplexity(self,m,md,method):
+        md["cells"] = self.kgrapchAndObjCells(m[method]["partition"])
+        md["facets"] = self.offFacets(m[method]["surface"])
+
+
 
     def eval(self, models, outpath, transform=False, method=""):
+
+        self.eval_dicts=[]
 
         for m in tqdm(models, ncols=50):
 
@@ -242,8 +257,12 @@ class MeshEvaluator(object):
                     files = glob.glob(os.path.join(outpath,m["model"]+"*"))
                 elif method == "P2S~\cite{points2surf}":
                     files = glob.glob(os.path.join(outpath, m["class"]+"_"+m["model"] + "*"))
+                elif method == "ksr" or method == "abspy":
+                    # files = glob.glob(os.path.join(outpath, m["model"], m["class"], "surface*"))
+                    files = [m[method]["surface"]]
                 else:
                     files = glob.glob(os.path.join(outpath,m["class"],m["model"]+"*"))
+
                 mesh_files = [file for file in files
                          if os.path.isfile(file)]
 
@@ -274,7 +293,10 @@ class MeshEvaluator(object):
                 md["non-manifold_edges"] = eval_dict_mesh["non-manifold_edges"]
                 md["watertight"] = eval_dict_mesh["watertight"]
                 if (not md["watertight"]):
-                    print("Non watertight mesh {}/{}".format(m["class"], m["model"]))
+                    print("\nNon watertight mesh {}/{}".format(m["class"], m["model"]))
+
+                if(method=="abspy" or method == "ksr"):
+                    self.getComplexity(m,md,method)
 
                 self.eval_dicts.append(md)
 
@@ -283,13 +305,15 @@ class MeshEvaluator(object):
                 print(e)
                 print("Skipping {}/{}".format(m["class"], m["model"]))
 
-        eval_df = pd.DataFrame(self.eval_dicts)
-        eval_df.to_pickle(os.path.join(outpath, "results_all.pkl"))
-        eval_df_class = eval_df.groupby(by=['class']).mean()
-        eval_df_class.loc['mean'] = eval_df.mean()
+        eval_df_full = pd.DataFrame(self.eval_dicts)
+        eval_df_full.to_pickle(os.path.join(outpath, "results_all.pkl"))
+        # print(eval_df)
+        eval_df_class = eval_df_full.groupby(by=['class']).mean()
+        eval_df_class.loc['mean'] = eval_df_full.mean(numeric_only=True)
+
         eval_df_class.to_csv(os.path.join(outpath, "results.csv"))
 
-        return eval_df_class
+        return eval_df_full, eval_df_class
 
 
 

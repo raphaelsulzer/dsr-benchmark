@@ -1,115 +1,24 @@
-import os, sys, subprocess, trimesh
+import os, subprocess
 import open3d as o3d
 import numpy as np
 import configparser
+import glob
 
-sure_dir = "/home/adminlocal/PhD/cpp/mesh-tools/build/release"
+SURE_DIR = "/home/rsulzer/cpp/mesh-tools/build/release"
 
-# mesh = os.path.join(path,"mesh.off")
-# mesh = trimesh.load(mesh)
-stddev = 0.0025
-
-## uniform
-# n=3000
-# uniform_points = mesh.sample(n)
-# noise = stddev * np.random.randn(*uniform_points.shape)
-# pcd = o3d.geometry.PointCloud()
-# pcd.points = o3d.utility.Vector3dVector(uniform_points+noise)
-# o3d.io.write_point_cloud(os.path.join(path,"uniform_"+str(n)+".ply"),pcd)
-#
-# command = [sure_dir+"/normal",
-#            "-w", path,
-#            "-i", "uniform_"+str(n)+".ply",
-#            "--neighborhood", "30"]
-# print(*command)
-# p = subprocess.Popen(command)
-# p.wait()
-
-
-## scan
-# cams = 5
-# n=3000
-# command = [sure_dir+"/scan",
-#            "-w", path,
-#            "-i", "mesh.off",
-#            "-o", "scan_"+str(n),
-#            "--cameras", str(cams),
-#            "--points", str(n),
-#            "--noise", str(stddev),
-#            "--normal_method", "jet",
-#            "--normal_neighborhood", "30",
-#            "--export", "all"]
-# print(*command)
-# p = subprocess.Popen(command)
-# p.wait()
-
-
-
-# lidar.ply is Ignatius02.ply lidar scan with the following sensor coords:
-# -1.851682 -1.862650 -5.837185
-
-# clouds = ["lidar.ply",
-#           "scan_100000.ply",
-#           "uniform_100000.ply",
-#           "mvs.ply"]
-#
-# cam = dict(pos=(0.8373, -0.6862, 0.4311),
-#            focalPoint=(-0.07846, 0.02467, 0.2840),
-#            viewup=(-0.09310, 0.08535, 0.9920),
-#            distance=1.169,
-#            clippingRange=(0.1948, 2.214))
-#
-# # mesh = vedo.load(mesh)
-#
-# for c in clouds:
-#
-#     file = os.path.join(path,c)
-#
-#     if file.endswith(".ply"):
-#         data = vedo.load(file)
-#         points = vedo.Points(data, r=15.0)
-#         points = points.computeNormalsWithPCA()
-#
-#     else:
-#         data = np.load(file)
-#
-#         points = data["points"]
-#         sensor_vec = data["sensor_position"] - points
-#         sensor_vec_norm = sensor_vec / np.linalg.norm(sensor_vec, axis=1)[:, np.newaxis]
-#
-#         points = vedo.Points(points, r=15.0)
-#         points = points.computeNormalsWithPCA()
-#
-#     light=[0.3, -0.3, 0.5]
-#     p2 = vedo.Point(light, c='y')
-#     l2 = vedo.Light(p2, c='w', intensity=1)
-#
-#
-#
-#     image_file = os.path.join(path,"img",file.split(".")[0]+".png")
-#
-#
-#
-#     # ### without aux
-#     interactive = True
-#     p = vedo.show(points, p2,l2, size=(700, 700), camera=cam, interactive=interactive)
-#     vedo.io.screenshot(image_file)
-#     p.close()
-#
-#     a=5
+stddev = 0.0015
 
 class Ignatius:
 
-    def __init__(self):
-        # self.path = "/home/adminlocal/PhD/PhD-Thesis-Harvard/python/scanning/data/bunny"
-        self.path = "/home/adminlocal/PhD/data/Ignatius/"
+    def __init__(self,path):
+
+        self.path = path
 
         self.trans = None
         self.trans_a = None
         self.trans_b = None
         self.trans_c = None
 
-        # self.path = "/Users/mba222/PhD/data/Ignatius"
 
     def uniform_sampling(self,mesh,stddev):
         n=250000
@@ -119,7 +28,7 @@ class Ignatius:
         pcd.points = o3d.utility.Vector3dVector(uniform_points+noise)
         o3d.io.write_point_cloud(os.path.join(self.path,"uniform_"+str(n)+".ply"),pcd)
 
-        command = [sure_dir+"/normal",
+        command = [SURE_DIR+"/normal",
                    "-w", self.path,
                    "-i", "uniform_"+str(n)+".ply",
                    "--neighborhood", "30"]
@@ -201,11 +110,9 @@ class Ignatius:
         # export trans
         np.savetxt(os.path.join(self.path,"openMVS","final_trans.txt"),self.trans)
 
-
-
         # draw_registration_result(source, target, reg_p2p.transformation)
 
-    def translateToCenter(self):
+    def translateMvsToCenter(self):
 
         data=np.load(os.path.join(self.path,"openMVS","densify_file.npz"))
         pc = o3d.geometry.PointCloud()
@@ -220,6 +127,11 @@ class Ignatius:
         pc = vol.crop_point_cloud(pc)
 
         mesh = o3d.io.read_triangle_mesh(os.path.join(self.path,"all_poisson.off"))
+
+        # one should actually do
+        # center=mesh.get_axis_aligned_bounding_box().get_center()
+        # see in translateLidarToCenter()
+
         center=mesh.get_center()
 
         mesh=mesh.translate(-center)
@@ -231,34 +143,60 @@ class Ignatius:
         pc=pc.scale(1/scale,[0,0,0])
 
 
-        o3d.io.write_point_cloud(os.path.join(self.path,"new_unit","mvs.ply"),pc)
-        o3d.io.write_triangle_mesh(os.path.join(self.path,"new_unit","mesh.off"),mesh)
-
-
-
-
-
+        o3d.io.write_point_cloud(os.path.join(self.path,"unit_mvs_alligned","mvs.ply"),pc)
+        o3d.io.write_triangle_mesh(os.path.join(self.path,"unit_mvs_alligned","mesh.off"),mesh)
 
         a=5
 
 
+    def translateLidarToCenter(self):
+
+        os.makedirs(os.path.join(self.path,"unit_lidar_alligned"),exist_ok=True)
+
+
+        mesh = o3d.io.read_triangle_mesh(os.path.join(self.path,"all_poisson.off"))
+        center=mesh.get_axis_aligned_bounding_box().get_center()
+        # center=mesh.get_center()
+
+        mesh = mesh.translate(-center)
+        ind = np.argmax(mesh.get_max_bound())
+        scale = np.abs(mesh.get_min_bound()[ind]) + np.abs(mesh.get_max_bound()[ind])
+        mesh=mesh.scale(1/scale,[0,0,0])
+
+        o3d.io.write_triangle_mesh(os.path.join(self.path,"unit_lidar_alligned","mesh.off"),mesh)
+
+        for file in glob.glob(os.path.join(self.path,"is_ori","*.ply")):
+            pc = o3d.io.read_point_cloud(file)
+            vol = o3d.visualization.read_selection_polygon_volume(os.path.join(self.path, "Ignatius.json"))
+            pc = vol.crop_point_cloud(pc)
+            pc = pc.translate(-center)
+            pc = pc.scale(1 / scale, [0, 0, 0])
+            o3d.io.write_point_cloud(os.path.join(self.path, "unit_lidar_alligned", os.path.basename(file)), pc)
+
+
+        a=5
+
     def scanMVS(self):
-        cams=8
+
+        subfolder = "unit_lidar_alligned"
+
+        cams=5
         # n=250000
         # n=374000
-        n=500000
-        command = [sure_dir+"/scan",
+        n=1400005
+        command = [SURE_DIR+"/scan",
                    "-w", self.path,
-                   "-i", "new_unit/mesh.off",
-                   "-o", "new_unit/scan_"+str(n),
+                   "-i", str(os.path.join(subfolder,"mesh.off")),
+                   "-o", str(os.path.join(subfolder,"scan_"+str(n))),
                    "--cameras", str(cams),
                    "--points", str(n),
                    "--noise", str(stddev),
-                   "--outliers", str(0.01),
-                   # "--normal_method", "jet",
-                   # "--normal_neighborhood", "30",
+                   # "--outliers", str(0.01),
+                   "--normal_method", "jet",
+                   "--normal_orientation", "1",
+                   "--normal_neighborhood", "30",
                    "--export", "all",
-                   "-e","v"]
+                   "-e","n"]
         # TODO: export this scan with sensors as normal field
         print(*command)
         p = subprocess.Popen(command)
@@ -358,13 +296,17 @@ class Ignatius:
 
 if __name__ == "__main__":
 
-    ign = Ignatius()
+    path = '/home/rsulzer/data/Ignatius/'
+    ign = Ignatius(path=path)
+
+    # ign.translateLidarToCenter()
 
     # ign.orientMVS()
     # ign.cropMVS()
     # ign.icpMVS()
 
     # ign.translateToCenter()
+
 
     ign.scanMVS()
 
