@@ -1,13 +1,8 @@
-from tqdm import tqdm
-
-from datasets.modelnet10 import ModelNet10
 from datasets.shapenet import ShapeNet
-from datasets.berger import Berger
 from evaluator.eval import MeshEvaluator
 
 import os
 import pandas as pd
-
 
 methods = []
 

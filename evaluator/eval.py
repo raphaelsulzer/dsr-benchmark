@@ -46,6 +46,7 @@ EMPTY_PCL_DICT = {
     'completeness2': 3,
     'accuracy2': 3,
     'chamfer': 6,
+    'hausdorff': 1000,
     'watertight': 0,
     'boundary_edges': 0,
     'non-manifold_edges': 0
@@ -175,21 +176,23 @@ class MeshEvaluator(object):
         completeness, completeness_normals = distance_p2p(
             pointcloud_tgt, normals_tgt, pointcloud, normals
         )
-        recall = get_threshold_percentage(completeness, thresholds)
+        # recall = get_threshold_percentage(completeness, thresholds)
         completeness2 = completeness ** 2
 
+        completeness_max = completeness.max()
         completeness = completeness.mean()
         completeness2 = completeness2.mean()
         completeness_normals = completeness_normals.mean()
 
-        # Accuracy: how far are th points of the predicted pointcloud
+        # Accuracy: how far are the points of the predicted pointcloud
         # from the target pointcloud
         accuracy, accuracy_normals = distance_p2p(
             pointcloud, normals, pointcloud_tgt, normals_tgt
         )
-        precision = get_threshold_percentage(accuracy, thresholds)
+        # precision = get_threshold_percentage(accuracy, thresholds)
         accuracy2 = accuracy ** 2
 
+        accuracy_max = accuracy.max()
         accuracy = accuracy.mean()
         accuracy2 = accuracy2.mean()
         accuracy_normals = accuracy_normals.mean()
@@ -200,6 +203,8 @@ class MeshEvaluator(object):
                 0.5 * completeness_normals + 0.5 * accuracy_normals
         )
         chamferL1 = 0.5 * (completeness + accuracy)
+
+        hausdorff = max(completeness_max,accuracy_max)
 
         # F-Score
         # F = [
@@ -217,6 +222,7 @@ class MeshEvaluator(object):
             'accuracy2': accuracy2,
             'chamfer-L2': chamferL2,
             'chamfer-L1': chamferL1 * 100,
+            'hausdorff' : hausdorff
             # 'f-score': F[9],  # threshold = 1.0%
             # 'f-score-15': F[14],  # threshold = 1.5%
             # 'f-score-20': F[19],  # threshold = 2.0%
@@ -287,13 +293,14 @@ class MeshEvaluator(object):
                 md["model"] = m["model"]
                 md["iou"] = eval_dict_mesh["iou"]
                 md["chamfer"] = eval_dict_mesh["chamfer-L1"]
+                md["hausdorff"] = eval_dict_mesh["hausdorff"]
                 md["normal"] = eval_dict_mesh["normals"]
                 md["components"] = eval_dict_mesh["components"]
                 md["boundary_edges"] = eval_dict_mesh["boundary_edges"]
                 md["non-manifold_edges"] = eval_dict_mesh["non-manifold_edges"]
                 md["watertight"] = eval_dict_mesh["watertight"]
-                if (not md["watertight"]):
-                    print("\nNon watertight mesh {}/{}".format(m["class"], m["model"]))
+                # if (not md["watertight"]):
+                #     print("\nNon watertight mesh {}/{}".format(m["class"], m["model"]))
 
                 if(method=="abspy" or method == "ksr"):
                     self.getComplexity(m,md,method)
@@ -311,7 +318,7 @@ class MeshEvaluator(object):
         eval_df_class = eval_df_full.groupby(by=['class']).mean()
         eval_df_class.loc['mean'] = eval_df_full.mean(numeric_only=True)
 
-        eval_df_class.to_csv(os.path.join(outpath, "results.csv"))
+        eval_df_class.to_csv(os.path.join(outpath, "results.csv"),float_format='%.3g')
 
         return eval_df_full, eval_df_class
 
