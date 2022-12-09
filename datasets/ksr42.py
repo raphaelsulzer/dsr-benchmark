@@ -2,10 +2,15 @@ import os, sys, subprocess
 sys.path.append(os.path.join(os.path.dirname(__file__)))
 from scan_settings import scan_settings
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+from libmesh import check_mesh_contains
 from tqdm import tqdm
 import numpy as np
 from glob import glob
 import trimesh
+import open3d as o3d
+
+DEBUG = 0
+
 
 class KSR42:
 
@@ -37,10 +42,12 @@ class KSR42:
                 d["model"] = m
                 d["scan_ply"] = glob(os.path.join(self.path,c,m,'*.ply'))[0]
 
-                d["occ"] = os.path.join(self.path,"eval",c,"points.npz")
-                d["pointcloud"] = os.path.join(self.path,"eval",c,"pointcloud.npz")
-                d["mesh"] = os.path.join(self.path,c,m,"mesh.ply")
-                d["planes"] = os.path.join(self.path,c,m,"planes.vg")
+                d["occ"] = os.path.join(self.path,c,m,"eval","points.npz")
+                d["pointcloud"] = os.path.join(self.path,c,m,"eval","pointcloud.npz")
+
+                d["pointcloud_ply"] = os.path.join(self.path,c,m,"pointcloud.ply")
+                d["mesh"] = os.path.join(self.path,c,m,"mesh_unit.off")
+                d["planes"] = os.path.join(self.path,c,m,"planes","planes.vg")
 
                 d["ksr"] = {}
                 d["ksr"]["surface"] = os.path.join(self.path,c,m,"ksr",'{}',"surface.off").format(ksr_k)
@@ -110,13 +117,48 @@ class KSR42:
                 print(e)
                 print("Skipping {}/{}".format(m["class"], m["model"]))
 
-    def normalize(self):
+    def standardize(self,padding=0.1):
 
-        for m in self.model_dicts:
+        for m in tqdm(self.model_dicts):
+
+            mesh = o3d.io.read_triangle_mesh(m["mesh"])
+            center = mesh.get_axis_aligned_bounding_box().get_center()
+
+            mesh = mesh.translate(-center)
+
+
+            max_bound = np.vstack([np.abs(mesh.get_min_bound()), mesh.get_max_bound()])
+            col_index = np.argmax(max_bound,axis=1)[1]
+            scale = np.abs(mesh.get_min_bound()[col_index]) + np.abs(mesh.get_max_bound()[col_index])
+
+
+            mesh = mesh.scale((1-padding) / scale, [0, 0, 0])
+
+            o3d.io.write_triangle_mesh(os.path.splitext(m["mesh"])[0]+"_unit.off",mesh)
+
+
+
+    def makePointcloudPLY(self,n_points=50000,std_noise=0.0):
+
+        print("Writing pointclouds for reconstruction input...\n")
+
+        for m in tqdm(self.model_dicts):
+
+            data = np.load(m["pointcloud"])
+
+            ind = np.random.randint(0, data["points"].shape[0], size = (n_points,))
+
+            pcd = o3d.geometry.PointCloud()
+            pcd.points = o3d.utility.Vector3dVector(data["points"][ind])
+            pcd.normals = o3d.utility.Vector3dVector(data["normals"][ind])
+            o3d.io.write_point_cloud(m["pointcloud_ply"], pcd)
+
 
 
 
     def sample(self,n_points=100000):
+
+        print("Sample points on surface and in bounding box for evaluation...\n")
 
 
         if(len(self.model_dicts) < 1):
@@ -128,7 +170,7 @@ class KSR42:
         scale = 1.0
 
 
-        for m in self.model_dicts:
+        for m in tqdm(self.model_dicts):
 
             mesh = trimesh.load(m["mesh"])
 
@@ -136,10 +178,17 @@ class KSR42:
             points_surface, fid = mesh.sample(n_points,return_index=True)
             normals = mesh.face_normals[fid]
 
-            fpath = os.path.join(self.path,m["class"],m["model"],"eval","pointcloud.npz")
+            fpath = os.path.join(self.path,m["class"],m["model"],"eval")
+            os.makedirs(fpath,exist_ok=True)
             filename = os.path.join(fpath,"pointcloud.npz")
-            print('Writing points: %s' % filename)
             np.savez(filename, points=points_surface, normals=normals, loc=loc, scale=scale)
+
+            if DEBUG:
+                print('Writing points: %s' % filename)
+                pcd = o3d.geometry.PointCloud()
+                pcd.points = o3d.utility.Vector3dVector(points_surface)
+                pcd.normals = o3d.utility.Vector3dVector(normals)
+                o3d.io.write_point_cloud(os.path.join(fpath,"pointcloud.ply"), pcd)
 
 
 
@@ -157,15 +206,24 @@ class KSR42:
 
             occupancies = check_mesh_contains(mesh, points)
 
+            colors = np.zeros(shape=(n_points, 3)) + [0, 0, 1]
+            colors[occupancies] = [1,0,0]
+
+
+
             dtype = np.float16
             points = points.astype(dtype)
             occupancies = np.packbits(occupancies)
 
-            filename = os.path.join(self.path,"eval",m["class"],"points.npz")
-            print('Writing points: %s' % filename)
+            filename = os.path.join(self.path,m["class"],m["model"],"eval","points.npz")
             np.savez(filename, points=points, occupancies=occupancies,loc=loc, scale=scale)
 
-
+            if DEBUG:
+                print('Writing points: %s' % filename)
+                pcd = o3d.geometry.PointCloud()
+                pcd.points = o3d.utility.Vector3dVector(points)
+                pcd.colors = o3d.utility.Vector3dVector(colors)
+                o3d.io.write_point_cloud(os.path.join(fpath,"points.ply"), pcd)
 
 
 

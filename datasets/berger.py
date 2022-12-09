@@ -49,7 +49,8 @@ class Berger:
 
                     d["occ"] = os.path.join(self.path,"eval",c,"points.npz")
                     d["pointcloud"] = os.path.join(self.path,"eval",c,"pointcloud.npz")
-                    d["scan_normal"] = os.path.join(self.path,"scan_ply","with_normals",c+"_"+s+".ply")
+
+                    d["pointcloud_ply"] = os.path.join(self.path,"scan_ply","with_normals",c+"_"+s+".ply")
 
                     d["mesh"] = os.path.join(self.path,"mesh",c+"_light.off")
 

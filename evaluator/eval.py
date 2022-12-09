@@ -308,9 +308,12 @@ class MeshEvaluator(object):
                 self.eval_dicts.append(md)
 
             except Exception as e:
-                raise
+                # raise
                 print(e)
                 print("Skipping {}/{}".format(m["class"], m["model"]))
+
+                # return None
+
 
         eval_df_full = pd.DataFrame(self.eval_dicts)
         eval_df_full.to_pickle(os.path.join(outpath, "results_all.pkl"))
