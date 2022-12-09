@@ -110,13 +110,13 @@ class KSR42:
                 print(e)
                 print("Skipping {}/{}".format(m["class"], m["model"]))
 
+    def normalize(self):
 
-    def sample_surface(self,n_points=100000):
-
-        pass
+        for m in self.model_dicts:
 
 
-    def sample_bb(self,n_points=100000):
+
+    def sample(self,n_points=100000):
 
 
         if(len(self.model_dicts) < 1):
@@ -136,7 +136,8 @@ class KSR42:
             points_surface, fid = mesh.sample(n_points,return_index=True)
             normals = mesh.face_normals[fid]
 
-            filename = os.path.join(self.path,"eval",m["class"],"pointcloud.npz")
+            fpath = os.path.join(self.path,m["class"],m["model"],"eval","pointcloud.npz")
+            filename = os.path.join(fpath,"pointcloud.npz")
             print('Writing points: %s' % filename)
             np.savez(filename, points=points_surface, normals=normals, loc=loc, scale=scale)
 
