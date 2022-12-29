@@ -1,5 +1,5 @@
-import pydevd_pycharm
-pydevd_pycharm.settrace('localhost', port=1090, stdoutToServer=True, stderrToServer=True)
+#import pydevd_pycharm
+#pydevd_pycharm.settrace('localhost', port=1090, stdoutToServer=True, stderrToServer=True)
 
 import bpy
 import bmesh
@@ -46,7 +46,7 @@ class RenderReal:
         self.scene_coll = bpy.context.scene.collection
         
         
-    def makeCam(self):
+    def make_cam(self):
         ## make camera and link it
         camera_data = bpy.data.cameras.new("Camera")
         camera = bpy.data.objects.new("Camera", camera_data)
@@ -62,7 +62,7 @@ class RenderReal:
         bpy.context.scene.camera = camera
 
 
-    def render(self,file):
+    def render_mesh(self,file):
 
         ## get file and put it in scene collection
         bpy.ops.import_mesh.ply(filepath=file)
@@ -119,44 +119,12 @@ class RenderReal:
         mat.node_tree.links.new(node.outputs['Color'], mat.node_tree.nodes['Principled BSDF'].inputs[0])
         node.attribute_name = "color"
 
-
-        
         ob = bpy.context.scene.objects["pc.010"]
-        
+
         # set material to the object:
         ob.data.materials.append(mat)
         
         ob.color = (1,0,0,1)
-        
-        
-        
-        for mate in ob.materials:
-            pass
-
-        
-        
-    
-    
-    def render_pc2(self,file):
-        
-        data = np.load(file)
-        
-        # Create and arrange mesh data
-        m     = bpy.data.meshes.new('pc')
-        m.from_pydata(data["points"], [], [])
-        # Create mesh object and link to scene collection
-        o = bpy.data.objects.new( 'pc', m )
-        self.coll.objects.link(o)
-        
-        
-        bm = bmesh.new()
-        bm.from_mesh(me)
-        for x, y, z, t, tau in verts:
-            co = scale * Vector((x, y, z))
-            v = bm.verts.new(co)
-            v.normal = colorsys.hls_to_rgb(tau, t, 1)
-
-        bm.to_mesh(me)
         
     
     def render_photogrammetry_addon(self, file):
@@ -167,39 +135,18 @@ class RenderReal:
         
         add_points_as_object_with_particle_system(points,self.coll,mesh_type='SPHERE',
         add_particle_color_emission=True,point_extent=0.001)
-        
-        
+
         bpy.context.scene.render.filepath = str(Path(file).with_suffix(".png"))
         bpy.context.scene.render.engine = 'CYCLES'
         bpy.ops.render.render(write_still=True)
         
         print("Renderer to", str(Path(file).with_suffix(".png")))
 
-    def get_rotation_matrix(self,axis, theta):
-        """
-        Find the rotation matrix associated with counterclockwise rotation
-        about the given axis by theta radians.
-        Credit: http://stackoverflow.com/users/190597/unutbu
 
-        Args:
-            axis (list): rotation axis of the form [x, y, z]
-            theta (float): rotational angle in radians
-
-        Returns:
-            array. Rotation matrix.
-        """
-        a = np.cos(theta/2.0)
-
-        b, c, d = -axis * np.expand_dims(np.sin(theta / 2.0),axis=1)
-        aa, bb, cc, dd = a * a, b * b, c * c, d * d
-        bc, ad, ac, ab, bd, cd = b * c, a * d, a * c, a * b, b * d, c * d
-        return np.array([[aa + bb - cc - dd, 2 * (bc + ad), 2 * (bd - ac)],
-                         [2 * (bc - ad), aa + cc - bb - dd, 2 * (cd + ab)],
-                         [2 * (bd + ac), 2 * (cd - ab), aa + dd - bb - cc]])
 
     def render_bplt(self, file):
         
-        
+        """this is the one to use for point cloud rendering"""
         data = np.load(file)
 
         angles = np.arccos(np.dot(data["normals"],[0,0,1]))
@@ -207,10 +154,13 @@ class RenderReal:
 
         cross = cross / np.linalg.norm(cross, axis=1)[:, np.newaxis]
 
-        #s=np.sqrt(1 - angles ** 2)
         quat = np.array([cross[:, 0], cross[:, 1], cross[:, 2], angles[:]]).transpose()
         rots = Rotation.from_quat(quat).as_matrix()
 
+        I=np.identity(3)
+        I[0,0]=-1
+        I[2,2]=-1
+        rots=rots@I
 
         scatter = bplt.Scatter(data["points"], 
                                 color=data["colors"], 
@@ -221,6 +171,30 @@ class RenderReal:
                                 marker_rotation=rots,
                                 randomize_rotation=False)
         # TODO: need to translate the normal direction to 3d euler rotation vector
+
+        bpy.context.scene.render.film_transparent = True
+        bpy.context.scene.render.image_settings.color_mode = 'RGBA'
+        bpy.context.scene.render.filepath = str(Path(file).with_suffix(".png"))
+        bpy.context.scene.render.engine = 'CYCLES'
+
+        ### might work but first need to install cuda (system wide / for system python)
+        ### see here how to do it https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#pip-wheels
+        # bpy.context.preferences.addons[
+        #     "cycles"
+        # ].preferences.compute_device_type = "CUDA"  # or "OPENCL"
+        #
+        # bpy.context.scene.cycles.device = "GPU"
+        #
+        # bpy.context.preferences.addons["cycles"].preferences.get_devices()
+        # print(bpy.context.preferences.addons["cycles"].preferences.compute_device_type)
+        # for d in bpy.context.preferences.addons["cycles"].preferences.devices:
+        #     d["use"] = 1  # Using all devices, include GPU and CPU
+        #     print(d["name"], d["use"])
+
+        bpy.context.scene.cycles.samples = 8
+        bpy.ops.render.render(write_still=True)
+
+        print("Renderer to", str(Path(file).with_suffix(".png")))
                                 
         
         
@@ -232,7 +206,7 @@ if __name__ == '__main__':
     
     rr = RenderReal()
     
-    rr.makeCam()
+    rr.make_cam()
     
     
     #rr.render("/home/rsulzer/data/real_out/paper/models/Ignatius/labatut.ply")
