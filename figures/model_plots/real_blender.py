@@ -16,6 +16,8 @@ import blender_plots as bplt
 from scipy.spatial.transform import Rotation
 import math
 
+
+
 class RenderReal:
     
     
@@ -46,18 +48,18 @@ class RenderReal:
         self.scene_coll = bpy.context.scene.collection
         
         
-    def make_cam(self):
+    def add_cam(self,location,orientation):
         ## make camera and link it
         camera_data = bpy.data.cameras.new("Camera")
         camera = bpy.data.objects.new("Camera", camera_data)
         # get camera location with C.scene.camera.location
-        camera.location = (0.3701401352882385, -1.5607348680496216, 0.0101625472307205)
+        camera.location = location
         # get camera angle with C.scene.camera.matrix_world.to_euler()
-        camera.rotation_euler = (1.533825159072876, -9.605929562894744e-07, 0.273378849029541)
+        camera.rotation_euler = orientation
         self.coll.objects.link(camera)
         # change camera size
-        bpy.context.scene.render.resolution_x = 1000
-        bpy.context.scene.render.resolution_y = 1000
+        bpy.context.scene.render.resolution_x = 1024
+        bpy.context.scene.render.resolution_y = 1024
         
         bpy.context.scene.camera = camera
 
@@ -70,12 +72,11 @@ class RenderReal:
 
         # remove it from scene collection
         self.scene_coll.objects.unlink(obj)
-
-        # add it to my collection
         self.coll.objects.link(obj)
 
+
         bpy.context.scene.render.filepath = str(Path(file).with_suffix(".png"))
-        bpy.context.scene.render.engine = 'BLENDER_WORKBENCH'
+        # bpy.context.scene.render.engine = 'BLENDER_WORKBENCH'
         bpy.ops.render.render(write_still=True)
 
         print("Mesh render saved to ",str(Path(file).with_suffix(".png")))
@@ -142,31 +143,34 @@ class RenderReal:
         
         print("Renderer to", str(Path(file).with_suffix(".png")))
 
-    def apply_render_settings(self):
+    def apply_render_settings(self,renderer='BLENDER_WORKBENCH',exposure=0.5,gamma=1.5,samples=4):
 
+        ## some color and lighting settings
         bpy.context.scene.view_settings.view_transform = 'Standard'
-        bpy.context.scene.view_settings.gamma = 0.92126
-        bpy.context.scene.view_settings.exposure = 1.41732
+        # bpy.context.space_data.shading.type = 'RENDERED'
 
+        ## transparent background
         bpy.context.scene.render.film_transparent = True
         bpy.context.scene.render.image_settings.color_mode = 'RGBA'
-        bpy.context.scene.render.engine = 'CYCLES'
-        bpy.context.preferences.addons["cycles"].preferences.compute_device_type = "CUDA"  # or "OPENCL"
-        bpy.context.scene.cycles.device = "GPU"
 
-        # bpy.context.preferences.addons["cycles"].preferences.get_devices()
-        # print(bpy.context.preferences.addons["cycles"].preferences.compute_device_type)
-        # for d in bpy.context.preferences.addons["cycles"].preferences.devices:
-        #     d["use"] = 1  # Using all devices, include GPU and CPU
-        #     print(d["name"], d["use"])
+        ## use GPU for rendering
+        bpy.context.scene.render.engine = renderer
+        if renderer == 'CYCLES':
+            bpy.context.preferences.addons["cycles"].preferences.compute_device_type = "CUDA"  # or "OPENCL"
+            bpy.context.scene.cycles.device = "GPU"
+            ## basically the higher the sharper the render
+            bpy.context.scene.cycles.samples = samples
+        else:
+            bpy.context.scene.cycles.device = "CPU"
+            bpy.data.scenes['Scene'].display.render_aa = str(samples)
 
-        bpy.context.scene.cycles.samples = 4
 
-    def add_light(self,location):
+
+    def add_light(self,location,energy=15):
 
         # create light datablock, set attributes
         light_data = bpy.data.lights.new(name="light", type='POINT')
-        light_data.energy = 15
+        light_data.energy = energy
 
         # create new object with our light datablock
         light_object = bpy.data.objects.new(name="light", object_data=light_data)
@@ -187,22 +191,29 @@ class RenderReal:
         """this is the one to use for point cloud rendering"""
         data = np.load(file)
 
-        angles = np.arccos(np.dot(data["normals"],[0,0,1]))
-        cross = np.cross(data["normals"],[0,0,1])
+        # normals to rotmat
+        marker_default_orient = [0,0,1]
+        angles = np.arccos(np.dot(data["normals"],marker_default_orient))
+        cross = np.cross(data["normals"],marker_default_orient)
 
         cross = cross / np.linalg.norm(cross, axis=1)[:, np.newaxis]
-
         quat = np.array([cross[:, 0], cross[:, 1], cross[:, 2], angles[:]]).transpose()
         rots = Rotation.from_quat(quat).as_matrix()
 
+        # has to be rotated 180 degrees when using cone marker
         I=np.identity(3)
         I[0,0]=-1
         I[2,2]=-1
         rots=rots@I
 
+
+        ## colors
+        colors = data["colors"]
+        colors = data["normals"][:,[1,2,0]]
+
         pc="pc"
         bplt.Scatter(data["points"],
-                                color=data["colors"], 
+                                color=colors,
                                 marker_type="cones",
                                 radius_bottom=1,
                                 radius_top=3,
@@ -215,30 +226,52 @@ class RenderReal:
         self.scene_coll.objects.unlink(obj)
         self.coll.objects.link(obj)
 
-        light = [0.956605,-0.261804,0.466202]
-        self.add_light(light)
-
-
-        self.apply_render_settings()
+        bpy.data.scenes['Scene'].display.shading.light = 'MATCAP'
+        bpy.data.scenes['Scene'].display.shading.studio_light = 'check_normal+y.exr'
+        bpy.data.scenes['Scene'].display.shading.color_type = 'OBJECT'
+        bpy.context.scene.view_settings.look = 'Medium High Contrast'
 
         bpy.context.scene.render.filepath = str(Path(file).with_suffix(".png"))
         bpy.ops.render.render(write_still=True)
         print("Renderer to", str(Path(file).with_suffix(".png")))
-                                
-        
-        
-        
-        
 
+
+def render_settings(model,mode):
+
+    match model:
+
+        case "ignatius":
+
+            match mode:
+
+                case "pc":
+                    bpy.context.scene.view_settings.exposure = 0.4
+                    bpy.context.scene.view_settings.gamma = 1.6
+                    bpy.context.scene.view_settings.look = 'Medium High Contrast'
+                case "mesh":
+                    bpy.context.scene.view_settings.exposure = 0.4
+                    bpy.context.scene.view_settings.gamma = 1.6
+                    bpy.context.scene.view_settings.look = 'Medium High Contrast'
 
 if __name__ == '__main__':
     
     rr = RenderReal()
-    
-    rr.make_cam()
-    
-    
-    #rr.render("/home/rsulzer/data/real_out/paper/models/Ignatius/labatut.ply")
+    location=(1.2647533416748047, -0.9426126480102539, -0.06860939413309097)
+    rr.add_cam(location,(1.5757203102111816, 0, 0.9924602508544922))
+    rr.add_light(location,energy=100)
+
+
+    rr.apply_render_settings(renderer='BLENDER_WORKBENCH',samples=32)
+
+    render_settings("ignatius","mesh")
+    rr.render_mesh("/home/rsulzer/data/real_out/paper/models/Ignatius/labatut.ply")
     # rr.render_pc("/home/rsulzer/data/real_out/paper/models/Ignatius/input.npz")
     #rr.render_photogrammetry_addon(r'/home/rsulzer/data/real_out/paper/models/Ignatius/input.ply')
-    rr.render_bplt("/home/rsulzer/data/real_out/paper/models/Ignatius/input.npz")
+
+    # rr.apply_render_settings(renderer='CYCLES',exposure=3.3,gamma=0.8,samples=4)
+    # rr.render_bplt("/home/rsulzer/data/real_out/paper/models/Ignatius/input.npz")
+
+
+
+
+
