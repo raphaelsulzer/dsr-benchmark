@@ -1,8 +1,11 @@
 import os, subprocess
+import copy
 import open3d as o3d
 import numpy as np
 import configparser
 import glob
+
+from npz2ply import npz2ply
 
 SURE_DIR = "/home/rsulzer/cpp/mesh-tools/build/release"
 
@@ -18,6 +21,57 @@ class Ignatius:
         self.trans_a = None
         self.trans_b = None
         self.trans_c = None
+
+
+    def makeLearning(self):
+
+        pcd_full = o3d.geometry.PointCloud()
+        points = []
+        sensors = []
+        sfile = list(open(glob.glob(os.path.join(self.path,"is_ori","*.txt"))[0]))
+        for i,file in enumerate(sorted(glob.glob(os.path.join(self.path,"is_ori","*.ply")))):
+            pcd = o3d.io.read_point_cloud(file)
+
+            parr = np.asarray(pcd.points)
+            sarr = np.array(sfile[i].split()[1:],dtype=float)
+            # points.append(parr)
+            # sensors.append(np.expand_dims(sarr,axis=0).repeat(parr.shape[0],axis=0))
+            pcd.normals = o3d.utility.Vector3dVector(np.expand_dims(sarr,axis=0).repeat(parr.shape[0],axis=0))
+            pcd_full+=pcd
+
+
+        # points = np.concatenate(points,axis=0)
+        # sensors = np.concatenate(sensors,axis=0)
+
+        vol = o3d.visualization.read_selection_polygon_volume(os.path.join(self.path,"Ignatius.json"))
+        pcd = vol.crop_point_cloud(pcd_full)
+
+        points = copy.deepcopy(np.asarray(pcd.points))
+        sensors = copy.deepcopy(np.asarray(pcd.normals))
+        colors = copy.deepcopy(np.asarray(pcd.colors))
+
+        center = pcd.get_axis_aligned_bounding_box().get_center()
+        pcd = pcd.translate(-center)
+
+        points-=center
+        sensors-=center
+
+        max_bound = np.vstack([np.abs(pcd.get_min_bound()), pcd.get_max_bound()])
+        col_index = np.argmax(max_bound, axis=1)[1]
+        scale = np.abs(pcd.get_min_bound()[col_index]) + np.abs(pcd.get_max_bound()[col_index])
+
+        pcd = pcd.scale(1 / scale, [0, 0, 0])
+
+        points/=scale
+        sensors/=scale
+
+        os.makedirs(os.path.join(self.path,"scan"),exist_ok=True)
+        np.savez(os.path.join(self.path,"scan","pointcloud.npz"),points=points,sensor_pos=sensors,colors=colors)
+
+        o3d.io.write_point_cloud(os.path.join(self.path,"scan","pointcloud.ply"), pcd)
+
+        # npz2ply(os.path.join(self.path, "eval", "poincloud.npz"), os.path.join(self.path, "eval", "pointcloud_npz.ply"),normal_type="sensor_vec")
+
 
 
     def uniform_sampling(self,mesh,stddev):
@@ -308,7 +362,10 @@ if __name__ == "__main__":
     # ign.translateToCenter()
 
 
-    ign.scanMVS()
+    # ign.scanMVS()
+
+    ign.makeLearning()
+
 
 
 

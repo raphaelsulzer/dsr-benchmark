@@ -8,6 +8,31 @@ from libmesh import check_mesh_contains
 import pandas as pd
 from tqdm import tqdm
 import glob
+import open3d as o3d
+
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+from matplotlib import cm
+
+class MplColorHelper:
+
+    """
+    great code from here: https://stackoverflow.com/a/26109298
+    which given two values start_val, stop_val makes a color gradient cmap in between.
+    then an array passed to cmap.get_rgb gives the corresponding colors in rgb
+    values of the array outside [start_val, stop_val] are simply assigned the endoint of the color gradient
+    works great in combination with start_val = np.percentile(array,5) and stop_val = np.percentile(array,95)
+    """
+
+    def __init__(self, cmap_name, start_val, stop_val):
+        self.cmap_name = cmap_name
+        self.cmap = plt.get_cmap(cmap_name)
+        self.norm = mpl.colors.Normalize(vmin=start_val, vmax=stop_val)
+        self.scalarMap = cm.ScalarMappable(norm=self.norm, cmap=self.cmap)
+
+    def get_rgb(self, val):
+        return self.scalarMap.to_rgba(val)
+
 
 def compute_iou(occ1, occ2):
     ''' Computes the Intersection over Union (IoU) value for two sets of
@@ -148,9 +173,43 @@ class MeshEvaluator(object):
 
         return out_dict
 
+    def color_pointcloud(self, pointcloud, pointcloud_tgt,normals,normals_tgt,accuracy,completeness,percentile=(2,98)):
+
+        # TODO: eventually it would probably be good to have the same scale per object, even when reconstruct with different methods
+        # one simple way would be to concatenate all accuracies (and completeness respectively) per object and then apply
+        # this function after all object have been treated. this way the accuracy and completeness percentiles are taken over all methods and
+        # the color gradient will be on the same scale
+
+        # nbins=50
+        # bins=np.linspace(accuracy.min(),accuracy.max(),nbins)
+        # accuracy=np.digitize(accuracy,bins)
+
+        # look up cmaps here: https://matplotlib.org/stable/tutorials/colors/colormaps.html, use _r to reverse them
+        cmap = 'hot_r'
+
+        pcda = o3d.geometry.PointCloud()
+        pcda.points = o3d.utility.Vector3dVector(pointcloud)
+        pcda.normals = o3d.utility.Vector3dVector(normals)
+        cols=MplColorHelper(cmap, np.percentile(accuracy,percentile[0]), np.percentile(accuracy,percentile[1])).get_rgb(accuracy)
+        # cols=MplColorHelper(cmap, accuracy.min(), accuracy.max()).get_rgb(accuracy)
+        pcda.colors = o3d.utility.Vector3dVector(cols[:,:3])
+
+        pcdc = o3d.geometry.PointCloud()
+        pcdc.points = o3d.utility.Vector3dVector(pointcloud_tgt)
+        pcdc.normals = o3d.utility.Vector3dVector(normals_tgt)
+        cols=MplColorHelper(cmap, np.percentile(completeness,percentile[0]), np.percentile(completeness,percentile[1])).get_rgb(completeness)
+        # cols=MplColorHelper(cmap, completeness.min(), completeness.max()).get_rgb(completeness)
+        pcdc.colors = o3d.utility.Vector3dVector(cols[:,:3])
+
+        return pcda, pcdc
+
+
+
+
+
     def eval_pointcloud(self, pointcloud, pointcloud_tgt,
                         normals=None, normals_tgt=None,
-                        thresholds=np.linspace(1. / 1000, 1, 1000)):
+                        thresholds=np.linspace(1. / 1000, 1, 1000),color=True):
         ''' Evaluates a point cloud.
 
         Args:
@@ -162,7 +221,7 @@ class MeshEvaluator(object):
         '''
         # Return maximum losses if pointcloud is empty
         if pointcloud.shape[0] == 0:
-            logger.warn('Empty pointcloud / mesh detected!')
+            logger.warning('Empty pointcloud / mesh detected!')
             out_dict = EMPTY_PCL_DICT.copy()
             if normals is not None and normals_tgt is not None:
                 out_dict.update(EMPTY_PCL_DICT_NORMALS)
@@ -177,11 +236,11 @@ class MeshEvaluator(object):
             pointcloud_tgt, normals_tgt, pointcloud, normals
         )
         # recall = get_threshold_percentage(completeness, thresholds)
-        completeness2 = completeness ** 2
+        # completeness2 = completeness ** 2
 
         completeness_max = completeness.max()
-        completeness = completeness.mean()
-        completeness2 = completeness2.mean()
+        completeness_mean = completeness.mean()
+        # completeness2 = completeness2.mean()
         completeness_normals = completeness_normals.mean()
 
         # Accuracy: how far are the points of the predicted pointcloud
@@ -190,19 +249,19 @@ class MeshEvaluator(object):
             pointcloud, normals, pointcloud_tgt, normals_tgt
         )
         # precision = get_threshold_percentage(accuracy, thresholds)
-        accuracy2 = accuracy ** 2
+        # accuracy2 = accuracy ** 2
 
         accuracy_max = accuracy.max()
-        accuracy = accuracy.mean()
-        accuracy2 = accuracy2.mean()
+        accuracy_mean = accuracy.mean()
+        # accuracy2 = accuracy2.mean()
         accuracy_normals = accuracy_normals.mean()
 
         # Chamfer distance
-        chamferL2 = 0.5 * (completeness2 + accuracy2)
+        # chamferL2 = 0.5 * (completeness2 + accuracy2)
         normals_correctness = (
                 0.5 * completeness_normals + 0.5 * accuracy_normals
         )
-        chamferL1 = 0.5 * (completeness + accuracy)
+        chamferL1 = 0.5 * (completeness_mean + accuracy_mean)
 
         hausdorff = max(completeness_max,accuracy_max)
 
@@ -213,20 +272,25 @@ class MeshEvaluator(object):
         # ]
 
         out_dict = {
-            'completeness': completeness,
-            'accuracy': accuracy,
+            'completeness': completeness_mean,
+            'accuracy': accuracy_mean,
             'normals completeness': completeness_normals,
             'normals accuracy': accuracy_normals,
             'normals': normals_correctness,
-            'completeness2': completeness2,
-            'accuracy2': accuracy2,
-            'chamfer-L2': chamferL2,
+            # 'completeness2': completeness2,
+            # 'accuracy2': accuracy2,
+            # 'chamfer-L2': chamferL2,
             'chamfer-L1': chamferL1 * 100,
-            'hausdorff' : hausdorff
+            'hausdorff' : hausdorff * 100
             # 'f-score': F[9],  # threshold = 1.0%
             # 'f-score-15': F[14],  # threshold = 1.5%
             # 'f-score-20': F[19],  # threshold = 2.0%
         }
+
+        if color:
+            out = self.color_pointcloud(pointcloud,pointcloud_tgt,normals,normals_tgt,accuracy,completeness)
+            out_dict["accuracy_pointcloud"] = out[0]
+            out_dict["completeness_pointcloud"] = out[1]
 
         return out_dict
 
@@ -245,9 +309,13 @@ class MeshEvaluator(object):
 
 
 
-    def eval(self, models, outpath, transform=False, method=""):
+    def eval(self, models, outpath, transform=False, method="",abspy_k=1,ksr_k=1,export_colored_pc=True):
 
         self.eval_dicts=[]
+
+        if not len(models):
+            print("ERROR: no models to evaluate")
+            return None
 
         for m in tqdm(models, ncols=50):
 
@@ -307,8 +375,18 @@ class MeshEvaluator(object):
 
                 self.eval_dicts.append(md)
 
+                if export_colored_pc:
+                    assert(eval_dict_mesh["accuracy_pointcloud"] is not None and eval_dict_mesh["completeness_pointcloud"] is not None)
+
+                    outfile = os.path.join(os.path.dirname(m[method]["surface"]),"accuracy_pc.ply")
+                    o3d.io.write_point_cloud(outfile,eval_dict_mesh["accuracy_pointcloud"])
+
+                    outfile = os.path.join(os.path.dirname(m[method]["surface"]),"completeness_pc.ply")
+                    o3d.io.write_point_cloud(outfile,eval_dict_mesh["completeness_pointcloud"])
+
+
             except Exception as e:
-                # raise
+                raise
                 print(e)
                 print("Skipping {}/{}".format(m["class"], m["model"]))
 
@@ -316,12 +394,14 @@ class MeshEvaluator(object):
 
 
         eval_df_full = pd.DataFrame(self.eval_dicts)
-        eval_df_full.to_pickle(os.path.join(outpath, "results_all.pkl"))
-        # print(eval_df)
+        if method == "ksr":
+            op = os.path.join(outpath, "results", "benchmark_full_ksr{}.csv".format(ksr_k))
+        elif method == "abspy":
+            op = os.path.join(outpath, "results", "benchmark_full_abspy{}.csv".format(abspy_k))
+        os.makedirs(os.path.join(outpath, "results"),exist_ok=True)
+        eval_df_full.to_csv(op)
         eval_df_class = eval_df_full.groupby(by=['class']).mean()
         eval_df_class.loc['mean'] = eval_df_full.mean(numeric_only=True)
-
-        eval_df_class.to_csv(os.path.join(outpath, "results.csv"),float_format='%.3g')
 
         return eval_df_full, eval_df_class
 

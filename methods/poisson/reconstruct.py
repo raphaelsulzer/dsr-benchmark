@@ -3,13 +3,18 @@ sys.path.append("/home/raphael/remote_python/benchmark")
 from tqdm import tqdm
 from datasets.modelnet10 import ModelNet10
 from datasets.ksr42 import KSR42
+from datasets.simpleShapes import simpleShapes
+from datasets.real import Real
 import time
 
-POISSON_EXE = "/home/rsulzer/cpp/PoissonRecon/Bin/Linux/PoissonRecon"
+POISSON_EXE = "/home/raphael/cpp/PoissonReconOri/Bin/Linux/PoissonRecon"
 
-dataset = KSR42()
+# dataset = simpleShapes()
+# models = dataset.getModels()
+
+dataset = Real(classes=["50000"])
 models = dataset.getModels()
-
+outpath = "/mnt/raphael/real_out/poisson/"
 
 # dataset = ShapeNet()
 # split = "test100"
@@ -32,10 +37,10 @@ for m in tqdm(models,ncols=50):
     b = boundary[0]
     d = depth[0]
     # try:
-    os.makedirs(os.path.join(dataset.path,m["class"]), exist_ok=True)
+    os.makedirs(os.path.join(outpath,m["class"]), exist_ok=True)
     command = [POISSON_EXE,
                "--in", m["scan_ply"],
-               "--out", os.path.join(dataset.path,m["class"],m["mesh"]),
+               "--out", os.path.join(outpath,m["class"],m["model"]),
                "--depth", str(d),
                "--bType", str(b)]
     print("run command: ", *command)

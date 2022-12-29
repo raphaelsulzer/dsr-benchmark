@@ -12,56 +12,46 @@ import open3d as o3d
 DEBUG = 0
 
 
-class KSR42:
+class simpleShapes:
 
-    def __init__(self,path="/home/rsulzer/data/KSR42_dataset",
-                 classes=[], mesh_tools_dir="/home/rsulzer/cpp/mesh-tools/build/release"):
+    def __init__(self,path="/home/rsulzer/data/simpleShapes", mesh_tools_dir="/home/rsulzer/cpp/mesh-tools/build/release"):
 
         self.path = path
-        self.classes = classes if isinstance(classes,list) else [classes]
-
         self.model_dicts = []
         self.mesh_tools_dir = mesh_tools_dir
+        self.POISSON_EXE = "/home/rsulzer/cpp/PoissonRecon/Bin/Linux/PoissonRecon"
 
-        if not classes:
-            with open(os.path.join(self.path, "classes.lst"), 'r') as f:
-                categories = f.read().split('\n')
-            if '' in categories:
-                categories.remove('')
-            self.classes = categories
 
     def getModels(self,ksr_k=1,abspy_k=1,hint=None):
 
-        for c in self.classes:
+        models = np.genfromtxt(os.path.join(self.path,"models.lst"),dtype=str)
+        for m in models:
 
-            models = np.genfromtxt(os.path.join(self.path,c,"models.lst"),dtype=str)
-            for m in models:
+            if hint is not None:
+                if hint not in m:
+                    continue
 
-                if hint is not None:
-                    if hint not in m:
-                        continue
+            d = {}
+            d["class"] = ""
+            d["model"] = m
+            d["scan_ply"] = glob(os.path.join(self.path,d["class"],m,'*.ply'))[0]
 
-                d = {}
-                d["class"] = c
-                d["model"] = m
-                d["scan_ply"] = glob(os.path.join(self.path,c,m,'*.ply'))[0]
+            d["occ"] = os.path.join(self.path,d["class"],m,"eval","points.npz")
+            d["pointcloud"] = os.path.join(self.path,d["class"],m,"eval","pointcloud.npz")
 
-                d["occ"] = os.path.join(self.path,c,m,"eval","points.npz")
-                d["pointcloud"] = os.path.join(self.path,c,m,"eval","pointcloud.npz")
+            d["pointcloud_ply"] = os.path.join(self.path,d["class"],m,"pointcloud.ply")
+            d["mesh"] = os.path.join(self.path,d["class"],m,"mesh_unit.off")
+            d["planes"] = os.path.join(self.path,d["class"],m,"planes","planes.vg")
 
-                d["pointcloud_ply"] = os.path.join(self.path,c,m,"pointcloud.ply")
-                d["mesh"] = os.path.join(self.path,c,m,"mesh_unit.off")
-                d["planes"] = os.path.join(self.path,c,m,"planes","planes.vg")
+            d["ksr"] = {}
+            d["ksr"]["surface"] = os.path.join(self.path,d["class"],m,"ksr",'{}',"surface.off").format(ksr_k)
+            d["ksr"]["partition"] = os.path.join(self.path,d["class"],m,"ksr",'{}',"partition.kgraph").format(ksr_k)
 
-                d["ksr"] = {}
-                d["ksr"]["surface"] = os.path.join(self.path,c,m,"ksr",'{}',"surface.off").format(ksr_k)
-                d["ksr"]["partition"] = os.path.join(self.path,c,m,"ksr",'{}',"partition.kgraph").format(ksr_k)
+            d["abspy"] = {}
+            d["abspy"]["surface"] = os.path.join(self.path,d["class"],m,"abspy",'{}',"surface.off").format(abspy_k)
+            d["abspy"]["partition"] = os.path.join(self.path,d["class"],m,"abspy",'{}',"partition.obj").format(abspy_k)
 
-                d["abspy"] = {}
-                d["abspy"]["surface"] = os.path.join(self.path,c,m,"abspy",'{}',"surface.off").format(abspy_k)
-                d["abspy"]["partition"] = os.path.join(self.path,c,m,"abspy",'{}',"partition.obj").format(abspy_k)
-
-                self.model_dicts.append(d)
+            self.model_dicts.append(d)
 
         return self.model_dicts
 
@@ -120,6 +110,23 @@ class KSR42:
             except Exception as e:
                 print(e)
                 print("Skipping {}/{}".format(m["class"], m["model"]))
+
+
+    def makePoisson(self, depth=8, boundary=2):
+
+        for m in tqdm(self.model_dicts, ncols=50):
+            # try:
+            command = [self.POISSON_EXE,
+                       "--in", m["scan_ply"],
+                       "--out", os.path.join(self.path, m["class"], m["mesh"]),
+                       "--depth", str(depth),
+                       "--bType", str(boundary)]
+            print("run command: ", *command)
+            p = subprocess.Popen(command)
+            # p = subprocess.Popen(command, shell=False,stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+            p.wait()
+
+
 
     def standardize(self,padding=0.1):
 
@@ -234,8 +241,18 @@ class KSR42:
 
 if __name__ == '__main__':
 
-    ds = KSR42()
+    ds = simpleShapes()
+
     ds.getModels()
+
     # ds.standardize()
     # ds.sample(n_points=1000000)
+
     ds.makePointcloudPLY(n_points=100000)
+
+
+
+
+
+
+

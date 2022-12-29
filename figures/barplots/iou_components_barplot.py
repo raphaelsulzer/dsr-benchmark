@@ -7,9 +7,6 @@ import numpy as np
 
 from methods.methods import learning_methods as methods
 
-
-# colors = sns.color_palette("Set2", len(methods))
-
 # colors = ["#ccece6","#66c2a4","#238b45","#005824","#f03b20","#d0d1e6","#034e7b"]
 colors = ["#dbddf2","#afb3e1","#555ec0","#373f94","#191d44","#fdc4b7","#fb6b4b"]
 
