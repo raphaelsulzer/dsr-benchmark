@@ -142,7 +142,45 @@ class RenderReal:
         
         print("Renderer to", str(Path(file).with_suffix(".png")))
 
+    def apply_render_settings(self):
 
+        bpy.context.scene.view_settings.view_transform = 'Standard'
+        bpy.context.scene.view_settings.gamma = 0.92126
+        bpy.context.scene.view_settings.exposure = 1.41732
+
+        bpy.context.scene.render.film_transparent = True
+        bpy.context.scene.render.image_settings.color_mode = 'RGBA'
+        bpy.context.scene.render.engine = 'CYCLES'
+        bpy.context.preferences.addons["cycles"].preferences.compute_device_type = "CUDA"  # or "OPENCL"
+        bpy.context.scene.cycles.device = "GPU"
+
+        # bpy.context.preferences.addons["cycles"].preferences.get_devices()
+        # print(bpy.context.preferences.addons["cycles"].preferences.compute_device_type)
+        # for d in bpy.context.preferences.addons["cycles"].preferences.devices:
+        #     d["use"] = 1  # Using all devices, include GPU and CPU
+        #     print(d["name"], d["use"])
+
+        bpy.context.scene.cycles.samples = 4
+
+    def add_light(self,location):
+
+        # create light datablock, set attributes
+        light_data = bpy.data.lights.new(name="light", type='POINT')
+        light_data.energy = 15
+
+        # create new object with our light datablock
+        light_object = bpy.data.objects.new(name="light", object_data=light_data)
+
+        # link light object
+        self.coll.objects.link(light_object)
+
+        # make it active
+        bpy.context.view_layer.objects.active = light_object
+
+        # change location
+        light_object.location = location
+
+        return light_object
 
     def render_bplt(self, file):
         
@@ -162,38 +200,29 @@ class RenderReal:
         I[2,2]=-1
         rots=rots@I
 
-        scatter = bplt.Scatter(data["points"], 
+        pc="pc"
+        bplt.Scatter(data["points"],
                                 color=data["colors"], 
                                 marker_type="cones",
                                 radius_bottom=1,
                                 radius_top=3,
                                 marker_scale=[0.001]*3,
                                 marker_rotation=rots,
-                                randomize_rotation=False)
-        # TODO: need to translate the normal direction to 3d euler rotation vector
+                                randomize_rotation=False,
+                                name=pc)
 
-        bpy.context.scene.render.film_transparent = True
-        bpy.context.scene.render.image_settings.color_mode = 'RGBA'
+        obj = bpy.context.scene.objects[pc]
+        self.scene_coll.objects.unlink(obj)
+        self.coll.objects.link(obj)
+
+        light = [0.956605,-0.261804,0.466202]
+        self.add_light(light)
+
+
+        self.apply_render_settings()
+
         bpy.context.scene.render.filepath = str(Path(file).with_suffix(".png"))
-        bpy.context.scene.render.engine = 'CYCLES'
-
-        ### might work but first need to install cuda (system wide / for system python)
-        ### see here how to do it https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#pip-wheels
-        # bpy.context.preferences.addons[
-        #     "cycles"
-        # ].preferences.compute_device_type = "CUDA"  # or "OPENCL"
-        #
-        # bpy.context.scene.cycles.device = "GPU"
-        #
-        # bpy.context.preferences.addons["cycles"].preferences.get_devices()
-        # print(bpy.context.preferences.addons["cycles"].preferences.compute_device_type)
-        # for d in bpy.context.preferences.addons["cycles"].preferences.devices:
-        #     d["use"] = 1  # Using all devices, include GPU and CPU
-        #     print(d["name"], d["use"])
-
-        bpy.context.scene.cycles.samples = 8
         bpy.ops.render.render(write_still=True)
-
         print("Renderer to", str(Path(file).with_suffix(".png")))
                                 
         
