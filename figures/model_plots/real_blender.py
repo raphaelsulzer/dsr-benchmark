@@ -1,22 +1,16 @@
 #import pydevd_pycharm
 #pydevd_pycharm.settrace('localhost', port=1090, stdoutToServer=True, stderrToServer=True)
+import os
 
 import bpy
-import bmesh
 import numpy as np
 from pathlib import Path
 from mathutils import Vector
 
-from photogrammetry_importer.file_handlers.point_data_file_handler import PointDataFileHandler
-from photogrammetry_importer.importers.point_utility import add_points_as_object_with_particle_system
-from photogrammetry_importer.importers.point_utility import add_points_as_mesh_vertices
-
 import blender_plots as bplt
-
 from scipy.spatial.transform import Rotation
-import math
 
-
+from glob import glob
 
 class RenderReal:
     
@@ -64,84 +58,27 @@ class RenderReal:
         bpy.context.scene.camera = camera
 
 
-    def render_mesh(self,file):
 
-        ## get file and put it in scene collection
-        bpy.ops.import_mesh.ply(filepath=file)
-        obj = bpy.context.active_object
+    def add_light(self,location,energy=15):
 
-        # remove it from scene collection
-        self.scene_coll.objects.unlink(obj)
-        self.coll.objects.link(obj)
+        # create light datablock, set attributes
+        light_data = bpy.data.lights.new(name="light", type='POINT')
+        light_data.energy = energy
 
+        # create new object with our light datablock
+        light_object = bpy.data.objects.new(name="light", object_data=light_data)
 
-        bpy.context.scene.render.filepath = str(Path(file).with_suffix(".png"))
-        # bpy.context.scene.render.engine = 'BLENDER_WORKBENCH'
-        bpy.ops.render.render(write_still=True)
+        # link light object
+        self.coll.objects.link(light_object)
 
-        print("Mesh render saved to ",str(Path(file).with_suffix(".png")))
-        
-    def render_pc(self,file):
-        
-        data = np.load(file)
-        
-        # Create and arrange mesh data
-        m     = bpy.data.meshes.new('pc')
-        m.from_pydata(data["points"], [], [])
-        # Create mesh object and link to scene collection
-        o = bpy.data.objects.new( 'pc', m )
-        self.coll.objects.link(o)
+        # make it active
+        bpy.context.view_layer.objects.active = light_object
 
-        # Add minimal icosphere
-        #bpy.ops.mesh.primitive_ico_sphere_add( subdivisions = 2, radius = 0.004 )
-        #bpy.ops.mesh.primitive_cube_add(size=0.005)
-        bpy.ops.mesh.primitive_grid_add(x_subdivisions=0, y_subdivisions=0, size=0.005)
-        isobj = bpy.data.objects[ bpy.context.object.name ]
-        
-        self.coll.objects.link(isobj)
-        self.scene_coll.objects.unlink(isobj)
-        
-        
-        
-        # Set instancing props
-        for ob in [ isobj, o ]:
-            ob.instance_type               = 'VERTS'
+        # change location
+        light_object.location = location
 
-        # Set instance parenting (parent icosphere to verts)
-        o.select_set(True)
-        bpy.context.view_layer.objects.active = o
+        return light_object
 
-        bpy.ops.object.parent_set( type = 'VERTEX', keep_transform = True )
-        
-        # adding material and setup nodes:
-        mat = bpy.data.materials.new("topo_mat")
-        mat.use_nodes = True
-        node = mat.node_tree.nodes.new("ShaderNodeAttribute")
-        mat.node_tree.links.new(node.outputs['Color'], mat.node_tree.nodes['Principled BSDF'].inputs[0])
-        node.attribute_name = "color"
-
-        ob = bpy.context.scene.objects["pc.010"]
-
-        # set material to the object:
-        ob.data.materials.append(mat)
-        
-        ob.color = (1,0,0,1)
-        
-    
-    def render_photogrammetry_addon(self, file):
-        
-        """Works but slow, and not sure how to change color. And no normal in the particle system"""
-        
-        points = PointDataFileHandler.parse_point_data_file(file, None)
-        
-        add_points_as_object_with_particle_system(points,self.coll,mesh_type='SPHERE',
-        add_particle_color_emission=True,point_extent=0.001)
-
-        bpy.context.scene.render.filepath = str(Path(file).with_suffix(".png"))
-        bpy.context.scene.render.engine = 'CYCLES'
-        bpy.ops.render.render(write_still=True)
-        
-        print("Renderer to", str(Path(file).with_suffix(".png")))
 
     def apply_render_settings(self,renderer='BLENDER_WORKBENCH',exposure=0.5,gamma=1.5,samples=4):
 
@@ -166,25 +103,26 @@ class RenderReal:
 
 
 
-    def add_light(self,location,energy=15):
 
-        # create light datablock, set attributes
-        light_data = bpy.data.lights.new(name="light", type='POINT')
-        light_data.energy = energy
+    def render_mesh(self,file):
 
-        # create new object with our light datablock
-        light_object = bpy.data.objects.new(name="light", object_data=light_data)
+        ## get file and put it in scene collection
+        bpy.ops.import_mesh.ply(filepath=file)
+        obj = bpy.context.active_object
 
-        # link light object
-        self.coll.objects.link(light_object)
+        # remove it from scene collection
+        self.scene_coll.objects.unlink(obj)
+        self.coll.objects.link(obj)
 
-        # make it active
-        bpy.context.view_layer.objects.active = light_object
 
-        # change location
-        light_object.location = location
+        bpy.context.scene.render.filepath = str(Path(file).with_suffix(".png"))
+        # bpy.context.scene.render.engine = 'BLENDER_WORKBENCH'
+        bpy.ops.render.render(write_still=True)
 
-        return light_object
+        print("Mesh render saved to ",str(Path(file).with_suffix(".png")))
+
+        self.coll.objects.unlink(obj)
+
 
     def render_bplt(self, file):
         
@@ -226,14 +164,13 @@ class RenderReal:
         self.scene_coll.objects.unlink(obj)
         self.coll.objects.link(obj)
 
-        bpy.data.scenes['Scene'].display.shading.light = 'MATCAP'
-        bpy.data.scenes['Scene'].display.shading.studio_light = 'check_normal+y.exr'
-        bpy.data.scenes['Scene'].display.shading.color_type = 'OBJECT'
-        bpy.context.scene.view_settings.look = 'Medium High Contrast'
+
 
         bpy.context.scene.render.filepath = str(Path(file).with_suffix(".png"))
         bpy.ops.render.render(write_still=True)
         print("Renderer to", str(Path(file).with_suffix(".png")))
+
+        self.coll.objects.unlink(obj)
 
 
 def render_settings(model,mode):
@@ -241,17 +178,19 @@ def render_settings(model,mode):
     match model:
 
         case "ignatius":
-
+            bpy.context.scene.view_settings.exposure = 0.4
+            bpy.context.scene.view_settings.gamma = 1.6
+            bpy.context.scene.view_settings.look = 'Medium High Contrast'
+            bpy.data.scenes['Scene'].display.shading.color_type = 'OBJECT'
             match mode:
 
                 case "pc":
-                    bpy.context.scene.view_settings.exposure = 0.4
-                    bpy.context.scene.view_settings.gamma = 1.6
-                    bpy.context.scene.view_settings.look = 'Medium High Contrast'
+                    bpy.data.scenes['Scene'].display.shading.light = 'MATCAP'
+                    bpy.data.scenes['Scene'].display.shading.studio_light = 'check_normal+y.exr'
                 case "mesh":
-                    bpy.context.scene.view_settings.exposure = 0.4
-                    bpy.context.scene.view_settings.gamma = 1.6
-                    bpy.context.scene.view_settings.look = 'Medium High Contrast'
+                    bpy.data.scenes['Scene'].display.shading.light = 'STUDIO'
+                    bpy.data.scenes['Scene'].display.shading.studio_light = 'rim.sl'
+
 
 if __name__ == '__main__':
     
@@ -261,15 +200,24 @@ if __name__ == '__main__':
     rr.add_light(location,energy=100)
 
 
-    rr.apply_render_settings(renderer='BLENDER_WORKBENCH',samples=32)
+    rr.apply_render_settings(renderer='BLENDER_WORKBENCH',samples=8)
 
-    render_settings("ignatius","mesh")
-    rr.render_mesh("/home/rsulzer/data/real_out/paper/models/Ignatius/labatut.ply")
-    # rr.render_pc("/home/rsulzer/data/real_out/paper/models/Ignatius/input.npz")
-    #rr.render_photogrammetry_addon(r'/home/rsulzer/data/real_out/paper/models/Ignatius/input.ply')
 
-    # rr.apply_render_settings(renderer='CYCLES',exposure=3.3,gamma=0.8,samples=4)
-    # rr.render_bplt("/home/rsulzer/data/real_out/paper/models/Ignatius/input.npz")
+    path = "/home/rsulzer/data/real_out/paper/models/Ignatius/"
+    methods = glob(path+"*.ply")
+
+    for me in methods:
+        if os.path.basename(me).split('.')[0] == 'input':
+            pass
+        else:
+            render_settings("ignatius", "mesh")
+            rr.render_mesh(me)
+
+
+    render_settings("ignatius","pc")
+    rr.render_bplt("/home/rsulzer/data/real_out/paper/models/Ignatius/input.npz")
+
+
 
 
 
