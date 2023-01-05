@@ -43,7 +43,7 @@ class ShapeNet:
             self.classes = temp
 
 
-    def getModels(self,splits=["train","val","test"],scan_conf="4",reduce=None):
+    def getModels(self,splits=["train","val","test"],scan_conf="4",reduce=None,hint=None):
         self.scan_conf = scan_conf
         self.splits = splits
         for s in splits:
@@ -59,6 +59,11 @@ class ShapeNet:
                     models = models[:int(len(models)*reduce)]
 
                 for m in models:
+
+                    if hint is not None:
+                        if hint not in m:
+                            continue
+
                     d = {}
                     d["class"] = c
                     d["model"] = m

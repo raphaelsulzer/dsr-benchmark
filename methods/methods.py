@@ -54,7 +54,8 @@ learning_methods.append(d)
 
 d=dict()
 # d["name"] = "Labatut~\etal"
-d["name"] = "Labatut $\it{et~al.}$"
+# d["name"] = "Labatut $\it{et~al.}$"
+d["name"] = "Labatut"
 d["cite"] = "\cite{Labatut2009a}"
 d["path"] = "labatut/{}"
 # d["out_type"] = "_rt_2.5.ply"

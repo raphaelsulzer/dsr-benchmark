@@ -4,6 +4,7 @@ from methods.methods import learning_methods
 import vedo
 import numpy as np
 import open3d as o3d
+from datasets.reconstructed_dataset import learning_dataset
 
 cam_dict = {}
 cam_dict["02691156/d2e99eeecebf0c77bd46d022fd7d80aa"] = dict(pos=(0.7568, 0.8104, 1.266),
@@ -27,30 +28,65 @@ light_dict["02691156/d2e99eeecebf0c77bd46d022fd7d80aa"] = [0.6,0.6,0.6]
 light_dict["bed/0585"] = [-0.6,-0.6,0.6]
 
 
-def get_models(methods):
-    for m in methods:
-        opath = os.path.join(outpath, experiment, m["name"] + m["out_type"])
-        # os.makedirs(outpath,exist_ok=True)
-        expath = m["path"].format(experiment)
-        cmd = ["scp", "enpc:/mnt/raphael/{}_out/benchmark/{}/{}".format(dataset,expath, model+m["out_type"]),
-               str(opath)]
-        print(*cmd)
-        p = subprocess.Popen(cmd)
-        p.wait()
+def get_models(dataset,methods):
 
-    ## input
-    cmd = ["scp", "enpc:/mnt/raphael/{}/{}/scan/{}.ply".format(dataset,model,scan),
-           str(os.path.join(outpath, experiment, "input.ply"))]
-    print(*cmd)
-    p = subprocess.Popen(cmd)
-    p.wait()
+    for experiment,d in dataset.items():
+        print("\nGet models from experiment ", experiment)
+        for model in d["models"]:
+            opath = os.path.join(outpath, experiment, model)
+            os.makedirs(opath, exist_ok=True)
 
-    ## ground truth
-    cmd = ["scp", "enpc:/mnt/raphael/{}/{}/mesh/mesh.off".format(dataset,model),
-           str(os.path.join(outpath, experiment, "gt.off"))]
-    print(*cmd)
-    p = subprocess.Popen(cmd)
-    p.wait()
+            for m in methods:
+                ofile = os.path.join(opath, m["name"] + m["out_type"])
+                # os.makedirs(outpath,exist_ok=True)
+                expath = m["path"].format(experiment)
+                cmd = ["scp", "enpc:/mnt/raphael/{}_out/benchmark/{}/{}".format(d["train_dataset"],expath, model+m["out_type"]),
+                       str(ofile)]
+                print(*cmd)
+                p = subprocess.Popen(cmd)
+                p.wait()
+
+            if(experiment=="reconbench"):
+                ## input ply
+                cmd = ["scp", "enpc:/mnt/raphael/{}/scan/{}/{}.ply".format(d["test_dataset"], model.split('/')[0], d["scan"]),
+                       str(os.path.join(opath, "input.ply"))]
+                print(*cmd)
+                p = subprocess.Popen(cmd)
+                p.wait()
+                ## input npz
+                cmd = ["scp", "enpc:/mnt/raphael/{}/scan/{}/{}.npz".format(d["test_dataset"], model.split('/')[0], d["scan"]),
+                       str(os.path.join(opath, "input.npz"))]
+                print(*cmd)
+                p = subprocess.Popen(cmd)
+                p.wait()
+
+                ## ground truth
+                cmd = ["scp", "enpc:/mnt/raphael/{}/mesh/{}.off".format(d["test_dataset"], model.split('/')[0]),
+                       str(os.path.join(opath, "gt.off"))]
+                print(*cmd)
+                p = subprocess.Popen(cmd)
+                p.wait()
+
+            else:
+                ## input ply
+                cmd = ["scp", "enpc:/mnt/raphael/{}/{}/scan/{}.ply".format(d["test_dataset"], model, d["scan"]),
+                       str(os.path.join(opath, "input.ply"))]
+                print(*cmd)
+                p = subprocess.Popen(cmd)
+                p.wait()
+                ## input npz
+                cmd = ["scp", "enpc:/mnt/raphael/{}/{}/scan/{}.npz".format(d["test_dataset"], model, d["scan"]),
+                       str(os.path.join(opath, "input.npz"))]
+                print(*cmd)
+                p = subprocess.Popen(cmd)
+                p.wait()
+
+                ## ground truth
+                cmd = ["scp", "enpc:/mnt/raphael/{}/{}/mesh/mesh.off".format(d["test_dataset"], model),
+                       str(os.path.join(opath, "gt.off"))]
+                print(*cmd)
+                p = subprocess.Popen(cmd)
+                p.wait()
 
 def plot_model_o3d(method,setview):
     mesh_file = os.path.join(outpath,experiment,method["name"]+method["out_type"])
@@ -146,32 +182,8 @@ def plot_models(methods):
         setview=False
 
 
-# learning_methods = [learning_methods[5]]
+outpath = "/home/rsulzer/data/benchmark"
 
 
-outpath = "/home/adminlocal/PhD/data/benchmark"
-
-experiment = "shapenet3000"
-model = "02691156/d18592d9615b01bbbc0909d98a1ff2b4"
-dataset = "ShapeNet"
-scan = "4"
-
-# experiment = "shapenet"
-# model = "02691156/d2e99eeecebf0c77bd46d022fd7d80aa"
-# dataset = "ModelNet"
-# scan = "4"
-
-# experiment = "modelnet"
-# model = "bed/0585"
-# dataset = "ShapeNet"
-# scan = "43"
-
-# experiment = "reconbench"
-# # model = "daratech/daratech"
-# model = "dc/dc"
-# dataset = "ShapeNet"
-# scan = "4"
-
-os.makedirs(os.path.join(outpath,experiment),exist_ok=True)
-# get_models(learning_methods)
-plot_models(learning_methods)
+get_models(learning_dataset,learning_methods)
+# plot_models(learning_methods)
