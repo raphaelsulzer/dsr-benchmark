@@ -16,7 +16,7 @@ from pyntcloud import PyntCloud
 
 import sys
 sys.path.append("/home/rsulzer/python/dsr-benchmark/datasets")
-from reconstructed_dataset import learning_dataset
+from reconstructed_dataset import learning_dataset, figures_dataset
 
 from mathutils import Vector, Matrix
 
@@ -116,7 +116,7 @@ class RenderReal:
         # bpy.context.space_data.shading.type = 'RENDERED'
 
         ## transparent background
-        bpy.context.scene.render.film_transparent = True
+        bpy.context.scene.render.film_transparent = False
         bpy.context.scene.render.image_settings.color_mode = 'RGBA'
 
         ## use GPU for rendering
@@ -160,10 +160,11 @@ class RenderReal:
         if self.remove_model:
             self.coll.objects.unlink(obj)
 
-    def custom_color(self,points=None,normals=None):
-
+    def color_along_axis(self,points,axis=1):
+        sign = np.sign(axis)
+        axis = np.abs(axis)-1
         cmap = 'jet'
-        return MplColorHelper(cmap, points[:,1].min(), points[:,1].max()).get_rgb(points[:,1])
+        return MplColorHelper(cmap, points[:,axis].min(), points[:,axis].max()).get_rgb(sign*points[:,axis])
         # cols=MplColorHelper(cmap, accuracy.min(), accuracy.max()).get_rgb(accuracy)
 
     def render_pc(self, file, out=None):
@@ -207,7 +208,7 @@ class RenderReal:
         rots = rots @ I
 
         ## colors
-        colors = self.custom_color(points=points)[:,:3]
+        colors = self.color_along_axis(points=points,axis=self.color_axis)[:,:3]
 
         pc = "pc"
         bplt.Scatter(points,
@@ -244,11 +245,11 @@ class RenderReal:
         self.rotate = None
 
         match mode:
-            case "input":
+            case "normal":
                 bpy.data.scenes['Scene'].display.shading.light = 'MATCAP'
                 bpy.data.scenes['Scene'].display.shading.studio_light = 'check_normal+y.exr'
                 bpy.data.scenes['Scene'].display.shading.color_type = 'OBJECT'
-            case "reconstruction":
+            case "single_color":
                 bpy.data.scenes['Scene'].display.shading.light = 'STUDIO'
                 bpy.data.scenes['Scene'].display.shading.studio_light = 'rim.sl'
                 bpy.data.scenes['Scene'].display.shading.single_color = (0.8, 0.183968, 0)
@@ -257,9 +258,27 @@ class RenderReal:
                 bpy.data.scenes['Scene'].display.shading.light = 'STUDIO'
                 bpy.data.scenes['Scene'].display.shading.studio_light = 'rim.sl'
                 bpy.data.scenes['Scene'].display.shading.color_type = 'VERTEX'
+            case "color":
+                bpy.data.scenes['Scene'].display.shading.light = 'STUDIO'
+                bpy.data.scenes['Scene'].display.shading.studio_light = 'rim.sl'
+                bpy.data.scenes['Scene'].display.shading.color_type = 'VERTEX'
 
+        self.color_axis=2
         match model:
-            # shapenet
+            case "dc/dc":
+                self.color_axis=1
+                self.rotate = [math.pi/2.2,0,0]
+                self.marker_scale = 0.002
+                # self.marker_scale = 0.005
+
+                self.light_location = (0.6792212128639221, -1.417323112487793, 0.2476280927658081)
+                self.camera_location = self.light_location
+                self.camera_orientation = (1.3872339725494385, 0, 0.4199945032596588)
+                self.resolution = (1024, 768)
+
+                bpy.context.scene.view_settings.exposure = 0.4
+                bpy.context.scene.view_settings.gamma = 1.6
+                bpy.context.scene.view_settings.look = 'Medium High Contrast'
             case "daratech/daratech":
                 self.marker_scale = 0.0025
                 # self.marker_scale = 0.005
@@ -272,8 +291,37 @@ class RenderReal:
                 bpy.context.scene.view_settings.exposure = 0.4
                 bpy.context.scene.view_settings.gamma = 1.6
                 bpy.context.scene.view_settings.look = 'Medium High Contrast'
+            # shapenet
+            case "02958343/1a0c91c02ef35fbe68f60a737d94994a":
+                self.color_axis = 1
+                self.rotate = [-math.pi / 2, 0, math.pi / 2]
+                self.marker_scale = 0.0025
+                # self.marker_scale = 0.005
+
+                self.light_location = (1.0699280500411987, 0.9045863747596741, -0.5949070453643799)
+                self.camera_location = self.light_location
+                self.camera_orientation = (-2.0126681327819824, 0, -0.8994788527488708)
+                self.resolution = (1024, 768)
+
+                bpy.context.scene.view_settings.exposure = 0.4
+                bpy.context.scene.view_settings.gamma = 1.6
+                bpy.context.scene.view_settings.look = 'Medium High Contrast'
+            case "02958343/1d343a64b4789983c10e9d4ee4bae4f4":
+                self.color_axis = -2
+                self.rotate = [-math.pi / 2, 0, math.pi / 2]
+                self.marker_scale = 0.0025
+                # self.marker_scale = 0.005
+
+                self.light_location = (1.0699280500411987, 0.9045863747596741, -0.5949070453643799)
+                self.camera_location = self.light_location
+                self.camera_orientation = (-2.0126681327819824, 0, -0.8994788527488708)
+                self.resolution = (1024, 768)
+
+                bpy.context.scene.view_settings.exposure = 0.4
+                bpy.context.scene.view_settings.gamma = 1.6
+                bpy.context.scene.view_settings.look = 'Medium High Contrast'
             case "02691156/d18592d9615b01bbbc0909d98a1ff2b4":
-                self.rotate = [-math.pi/2,0,math.pi/2]
+                self.rotate = [math.pi/2,0,-math.pi/2]
                 self.marker_scale = 0.0025
                 # self.marker_scale = 0.005
 
@@ -282,6 +330,40 @@ class RenderReal:
                 self.camera_orientation = (1.0102378129959106, 0, 0.6573612093925476)
                 self.resolution = (1024,768)
 
+                bpy.context.scene.view_settings.exposure = 0.4
+                bpy.context.scene.view_settings.gamma = 1.6
+                bpy.context.scene.view_settings.look = 'Medium High Contrast'
+            case "02691156/1bea1445065705eb37abdc1aa610476c":
+                self.rotate = [math.pi/2,0,-math.pi/2]
+                self.marker_scale = 0.0025
+                # self.marker_scale = 0.005
+
+                self.light_location = (0.6752992868423462, -0.9008161425590515, 0.610461413860321)
+                self.camera_location = self.light_location
+                self.camera_orientation = (1.010238528251648, 0, 0.6573624014854431)
+                self.resolution = (1024,768)
+
+                bpy.context.scene.view_settings.exposure = 0.4
+                bpy.context.scene.view_settings.gamma = 1.6
+                bpy.context.scene.view_settings.look = 'Medium High Contrast'
+            case "table/0008":
+                self.marker_scale = 0.0025
+                # get with C.scene.camera.location
+                self.light_location = (0.9463180899620056, 0.8051369786262512, 0.692879855632782)
+                self.camera_location = self.light_location
+                self.camera_orientation = (1.0241998434066772, 0, 2.2491040229797363)
+                self.resolution = (1024, 768)
+                bpy.context.scene.view_settings.exposure = 0.4
+                bpy.context.scene.view_settings.gamma = 1.6
+                bpy.context.scene.view_settings.look = 'Medium High Contrast'
+            case "table/0490":
+                self.color_axis = 1
+                self.marker_scale = 0.0025
+                # get with C.scene.camera.location
+                self.light_location = (0.8938982486724854, -1.7844570875167847, 1.3868521451950073)
+                self.camera_location = self.light_location
+                self.camera_orientation = (0.9474075436592102, 0, 0.4758685827255249)
+                self.resolution = (1024, 768)
                 bpy.context.scene.view_settings.exposure = 0.4
                 bpy.context.scene.view_settings.gamma = 1.6
                 bpy.context.scene.view_settings.look = 'Medium High Contrast'
@@ -295,7 +377,6 @@ class RenderReal:
                 bpy.context.scene.view_settings.exposure = 0.4
                 bpy.context.scene.view_settings.gamma = 1.6
                 bpy.context.scene.view_settings.look = 'Medium High Contrast'
-
             case "Ignatius":
                 self.marker_scale = 0.001
                 self.light_location = (1.2972263097763062, -0.8929003477096558, -0.06501338630914688)
@@ -307,6 +388,16 @@ class RenderReal:
                 bpy.context.scene.view_settings.gamma = 1.6
                 bpy.context.scene.view_settings.look = 'Medium High Contrast'
             case "Truck":
+                self.marker_scale = 0.001
+                self.light_location = (0.8238871097564697, -0.6957366466522217, -0.00797953549772501)
+                self.camera_location = self.light_location
+                self.camera_orientation = (1.5757216215133667, 0, 0.9924633502960205)
+                self.resolution = (1024,768)
+
+                bpy.context.scene.view_settings.exposure = 0.4
+                bpy.context.scene.view_settings.gamma = 1.6
+                bpy.context.scene.view_settings.look = 'Medium High Contrast'
+            case "real/Truck":
                 self.marker_scale = 0.001
                 self.light_location = (0.8238871097564697, -0.6957366466522217, -0.00797953549772501)
                 self.camera_location = self.light_location
@@ -349,6 +440,19 @@ class RenderReal:
                 bpy.context.scene.view_settings.exposure = 0.4
                 bpy.context.scene.view_settings.gamma = 1.6
                 bpy.context.scene.view_settings.look = 'Medium High Contrast'
+
+            case "Ignatius/Ignatius":
+                self.rotate = [0, 0, 0]
+                self.marker_scale = 0.001
+                self.light_location = (0.20547041296958923, -0.4521239399909973, 0.4659009575843811)
+                self.camera_location = self.light_location
+                self.camera_orientation = (1.3174161911010742, 0, 0.47584229707717896)
+
+                self.resolution = (1024, 1024)
+                bpy.context.scene.view_settings.exposure = 0.4
+                bpy.context.scene.view_settings.gamma = 1.6
+                bpy.context.scene.view_settings.look = 'Medium High Contrast'
+
             case _:
                 print("WARNING: apply default render settings")
                 self.rotate = False
@@ -372,6 +476,7 @@ if __name__ == '__main__':
 
     exp = {"real":{"models":["Ignatius","scan1","scan6","templeRing","Truck"]}}
     exp.update(learning_dataset)
+    exp.update(figures_dataset)
 
     # e = "shapenet10000"
     rr = RenderReal()
@@ -379,10 +484,9 @@ if __name__ == '__main__':
     rr.remove_model = True
 
     # experiments = ["shapenet","shapenet10000","shapenet3000","reconbench","modelnet"]
-    experiments = ["real"]
+    experiments = ["Ignatius"]
     for e in experiments:
         models = exp[e]["models"]
-        models = ["Truck"]
         outpath = os.path.join("/home/rsulzer/overleaf/SurveyAndBenchmark/figures/", e)
         for model in models:
             os.makedirs(os.path.join(outpath,model),exist_ok=True)
@@ -393,12 +497,14 @@ if __name__ == '__main__':
             methods = glob(inpath+"/*.ply")
 
             # need to remove the light and camera once I include this into model loop
-            rr.render_settings(model, "reconstruction")
+            rr.render_settings(model, "color")
 
             rr.add_cam(rr.camera_location, rr.camera_orientation, rr.resolution)
             rr.add_light(rr.light_location, energy=100)
 
             for me in methods:
+                # continue
+                rr.render_settings(model,input=)
                 method = os.path.basename(me).split('.')[0]
                 print("Process {}/{}".format(model, method))
                 if method == 'input' or method == 'full':
@@ -406,13 +512,43 @@ if __name__ == '__main__':
                     pass
                 else:
                     outfile = os.path.join(outpath, model, method+".jpg")
-                    rr.render_mesh(me,outfile)
+                    # rr.render_mesh(me,outfile)
+                    rr.render_pc(me,outfile) # pass a color
 
-            method = "input"
-            rr.render_settings(model, "axis")
-            # rr.render_settings(model, method)
-            outfile = os.path.join(outpath, model,method+"_.jpg")
-            rr.render_pc(os.path.join(inpath, method+".ply"),outfile)
+            try:
+                method = "input"
+                rr.render_settings(model, "axis")
+                # rr.render_settings(model, method)
+                outfile = os.path.join(outpath, model,method+".jpg")
+                rr.render_pc(os.path.join(inpath, method+".ply"),outfile)
+            except Exception as exc:
+                print(exc)
+
+            try:
+                method = "input3000"
+                rr.render_settings(model, "axis")
+                # rr.render_settings(model, method)
+                outfile = os.path.join(outpath, model,method+".jpg")
+                rr.render_pc(os.path.join(inpath, method+".ply"),outfile)
+            except Exception as exc:
+                print(exc)
+            try:
+                method = "input10000"
+                rr.render_settings(model, "axis")
+                # rr.render_settings(model, method)
+                outfile = os.path.join(outpath, model,method+".jpg")
+                rr.render_pc(os.path.join(inpath, method+".ply"),outfile)
+            except Exception as exc:
+                print(exc)
+
+            try:
+                method = "mesh"
+                rr.render_settings(model, "reconstruction")
+                # rr.render_settings(model, method)
+                outfile = os.path.join(outpath, model,method+".jpg")
+                rr.render_mesh(os.path.join(inpath, method+".ply"),outfile)
+            except Exception as exc:
+                print(exc)
 
             if rr.remove_model:
                 bpy.data.objects.remove(rr.camera, do_unlink=True)

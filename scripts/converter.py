@@ -21,14 +21,29 @@ class Converter:
 
 
 
-    def convert_from_npz(self,input, outtype):
+    def convert_from_npz(self,input, outtype, orient=None):
 
         data = np.load(input)
 
         pcd = o3d.geometry.PointCloud()
-        pcd.points = o3d.utility.Vector3dVector(data["points"])
+        points = data["points"]
+        pcd.points = o3d.utility.Vector3dVector(points)
+        if("sensor_pos" in data.keys()):
+            sensor_vec = data["sensor_pos"] - points
+        elif("sensor_position" in data.keys()):
+            sensor_vec = data["sensor_position"] - points
+        else:
+            sensor_vec = None
         if("normals" in data.keys()):
-            pcd.normals = o3d.utility.Vector3dVector(data["normals"])
+            normals = data["normals"]
+            if(orient == "sensor"):
+                if sensor_vec is None:
+                    print("ERROR: not sensor position in file for normal orientation")
+                    return 1
+                ip = np.einsum('ij,ij->i',normals, sensor_vec)
+                normals[ip<0] = -normals[ip<0]
+                normals = normals / np.linalg.norm(normals, axis=1)[:, np.newaxis]
+            pcd.normals = o3d.utility.Vector3dVector(normals)
         if("colors" in data.keys()):
             pcd.colors = o3d.utility.Vector3dVector(data["colors"])
 
@@ -44,10 +59,10 @@ class Converter:
 
         print("Pointcloud saved to ", os.path.splitext(input)[0] + "." + outtype)
 
-    def convert_pc(self, input, outtype):
+    def convert_pc(self, input, outtype, orient=None):
 
         if os.path.splitext(input)[1] == ".npz":
-            self.convert_from_npz(input, outtype)
+            self.convert_from_npz(input, outtype, orient=orient)
             return
         if outtype == "npz":
             self.convert_to_npz(input, outtype)
