@@ -309,7 +309,7 @@ class MeshEvaluator(object):
 
 
 
-    def eval(self, models, outpath, transform=False, method="",abspy_k=1,ksr_k=1,export_colored_pc=True):
+    def eval(self, models, inpath="", outpath="", transform=False, method="",abspy_k=1,ksr_k=1,export_colored_pc=True):
 
         self.eval_dicts=[]
 
@@ -328,14 +328,14 @@ class MeshEvaluator(object):
                 #     mesh_file = os.path.join(outpath, m["class"], m["model"] + ".off")
                 # mesh_file = os.path.join(outpath, m["class"], m["model"])
                 if method == "POCO~\cite{boulch2022poco}":
-                    files = glob.glob(os.path.join(outpath,m["model"]+"*"))
+                    files = glob.glob(os.path.join(inpath,m["model"]+"*"))
                 elif method == "P2S~\cite{points2surf}":
-                    files = glob.glob(os.path.join(outpath, m["class"]+"_"+m["model"] + "*"))
+                    files = glob.glob(os.path.join(inpath, m["class"]+"_"+m["model"] + "*"))
                 elif method == "ksr" or method == "abspy":
                     # files = glob.glob(os.path.join(outpath, m["model"], m["class"], "surface*"))
                     files = [m[method]["surface"]]
                 else:
-                    files = glob.glob(os.path.join(outpath,m["class"],m["model"]+"*"))
+                    files = glob.glob(os.path.join(inpath,m["class"],m["model"]+"*"))
 
                 mesh_files = [file for file in files
                          if os.path.isfile(file)]
@@ -395,10 +395,10 @@ class MeshEvaluator(object):
 
         eval_df_full = pd.DataFrame(self.eval_dicts)
         if method == "ksr":
-            op = os.path.join(outpath, "results", "benchmark_full_ksr{}.csv".format(ksr_k))
+            op = os.path.join(outpath, "benchmark_full_ksr{}.csv".format(ksr_k))
         elif method == "abspy":
-            op = os.path.join(outpath, "results", "benchmark_full_abspy{}.csv".format(abspy_k))
-        os.makedirs(os.path.join(outpath, "results"),exist_ok=True)
+            op = os.path.join(outpath, "benchmark_full_abspy{}.csv".format(abspy_k))
+        os.makedirs(os.path.join(outpath),exist_ok=True)
         eval_df_full.to_csv(op)
         eval_df_class = eval_df_full.groupby(by=['class']).mean()
         eval_df_class.loc['mean'] = eval_df_full.mean(numeric_only=True)

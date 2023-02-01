@@ -23,10 +23,12 @@ data for ConvONet, Points2Surf, Shape As Points, POCO and DGNN.
 - The watertight ShapeNet models can be downloaded [here](https://s3.eu-central-1.amazonaws.com/avg-projects/occupancy_networks/data/watertight.zip) (provided by the authors of [ONet](https://arxiv.org/abs/1812.03828)).
 - Please open an issue if you are interested in the scans used in our paper.
 
-### Synthetic Rooms Dataset
+[//]: # (### Synthetic Rooms Dataset)
 
-- The watertight scenes can be downloaded [here](https://s3.eu-central-1.amazonaws.com/avg-projects/convolutional_occupancy_networks/data/room_watertight_mesh.zip) (provided by the authors of [ConvONet](https://arxiv.org/abs/2003.04618)).
-- Please open an issue if you are interested in the scans used in our paper.
+[//]: # ()
+[//]: # (- The watertight scenes can be downloaded [here]&#40;https://s3.eu-central-1.amazonaws.com/avg-projects/convolutional_occupancy_networks/data/room_watertight_mesh.zip&#41; &#40;provided by the authors of [ConvONet]&#40;https://arxiv.org/abs/2003.04618&#41;&#41;.)
+
+[//]: # (- Please open an issue if you are interested in the scans used in our paper.)
 
 [//]: # (- The training and evaluation data for ConvONet can be downloaded here.)
 

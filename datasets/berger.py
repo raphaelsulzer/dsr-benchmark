@@ -4,11 +4,16 @@ from scan_settings import scan_settings
 import numpy as np
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from tqdm import tqdm
+import trimesh
+import open3d as o3d
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+from libmesh import check_mesh_contains
+from pathlib import Path
 
-
+DEBUG = 1
 class Berger:
 
-    def __init__(self,path="/mnt/raphael/reconbench",
+    def __init__(self,path="/home/rsulzer/data/reconbench",
                  classes=[],
                  mesh_tools_dir="/home/raphael/cpp/mesh-tools/build/release"
                  ):
@@ -27,8 +32,8 @@ class Berger:
 
     def getModels(self,scan_conf=["0","1","2","3","4"],reduce=None,ksr_k=1,abspy_k=1):
 
-        self.scan_conf = [scan_conf] if isinstance(scan_conf, str) else scan_conf
 
+        self.scan_conf = scan_conf if isinstance(scan_conf, list) else list(scan_conf)
 
         for s in self.scan_conf:
             for c in self.classes:
@@ -41,8 +46,8 @@ class Berger:
                         d["scan"] = os.path.join(self.path,"scan",c,s[3:]+".npz")
                         d["scan_ply"] = os.path.join(self.path,"scan",c,s[3:]+".ply")
                     else:
-                        d["scan"] = os.path.join(self.path,"scan_berger_1",c,s+".npz")
-                        d["scan_ply"] = os.path.join(self.path,"scan_berger_1",c,s+".ply")
+                        d["scan"] = os.path.join(self.path,"scan","{}_{}.npz".format(c,s))
+                        d["scan_ply"] = os.path.join(self.path,"scan",c,s+".ply")
 
                     d["convex_hull"] = os.path.join(self.path,"p2m","convex_hull",s,c+".obj")
                     d["poisson_6"] = os.path.join(self.path,"p2m","poisson",s,c+".ply")
@@ -55,6 +60,7 @@ class Berger:
                     d["mesh"] = os.path.join(self.path,"mesh",c+"_light.off")
 
                     d["planes"] = os.path.join(self.path,"planes",c,s,"planes.vg")
+                    d["ransac"] = os.path.join(self.path,"ransac",c,s,"planes.npz")
 
                     d["ksr"] = {}
                     d["ksr"]["surface"] = os.path.join(self.path,"ksr",'{}',c,s,"surface.off").format(ksr_k)
@@ -255,56 +261,82 @@ class Berger:
 
             a = 5
 
-    # def sample(self,n_points=100000):
-    #
-    #
-    #     if(len(self.model_dicts) < 1):
-    #         print("\nERROR: run getModels() first!")
-    #         sys.exit(1)
-    #
-    #
-    #     loc = np.zeros(3)
-    #     scale = 1.0
-    #
-    #
-    #     for m in self.model_dicts:
-    #
-    #         mesh = trimesh.load(m["mesh"])
-    #
-    #         # surface points
-    #         points_surface, fid = mesh.sample(n_points,return_index=True)
-    #         normals = mesh.face_normals[fid]
-    #
-    #         filename = os.path.join(self.path,"eval",m["class"],"pointcloud.npz")
-    #         print('Writing points: %s' % filename)
-    #         np.savez(filename, points=points_surface, normals=normals, loc=loc, scale=scale)
-    #
-    #
-    #
-    #         # IoU points
-    #
-    #         n_points_uniform = int(n_points * 0.5)
-    #         n_points_surface = n_points - n_points_uniform
-    #
-    #         boxsize = 1
-    #         points_uniform = np.random.rand(n_points_uniform, 3)
-    #         points_uniform = boxsize * (points_uniform - 0.5)
-    #         points_surface = mesh.sample(n_points_surface)
-    #         points_surface += 0.05 * np.random.randn(n_points_surface, 3)
-    #         points = np.concatenate([points_uniform, points_surface], axis=0)
-    #
-    #         occupancies = check_mesh_contains(mesh, points)
-    #
-    #         dtype = np.float16
-    #         points = points.astype(dtype)
-    #         occupancies = np.packbits(occupancies)
-    #
-    #         filename = os.path.join(self.path,"eval",m["class"],"points.npz")
-    #         print('Writing points: %s' % filename)
-    #         np.savez(filename, points=points, occupancies=occupancies,loc=loc, scale=scale)
+    def sample(self,n_points=100000):
+
+        print("Sample points on surface and in bounding box for evaluation...\n")
+
+
+        if(len(self.model_dicts) < 1):
+            print("\nERROR: run getModels() first!")
+            sys.exit(1)
+
+
+        loc = np.zeros(3)
+        scale = 75.0
+        padding = 0.1*scale
+
+
+        for m in tqdm(self.model_dicts):
+
+            dtype = np.float32
+
+
+            mesh = trimesh.load(m["mesh"])
+
+            # surface points
+            points_surface, fid = mesh.sample(n_points,return_index=True)
+            normals = mesh.face_normals[fid]
+
+            points_surface = points_surface.astype(dtype)
+            normals = normals.astype(dtype)
+
+            os.makedirs(os.path.dirname(m["pointcloud"]),exist_ok=True)
+            np.savez(m["pointcloud"], points=points_surface, normals=normals, loc=loc, scale=scale)
+
+            if DEBUG:
+                print('Writing points: %s' % m["pointcloud"])
+                pcd = o3d.geometry.PointCloud()
+                pcd.points = o3d.utility.Vector3dVector(points_surface)
+                pcd.normals = o3d.utility.Vector3dVector(normals)
+                o3d.io.write_point_cloud(str(Path(m["pointcloud"]).with_suffix(".ply")), pcd)
 
 
 
+            # IoU points
+
+            n_points_uniform = int(n_points * 0.5)
+            n_points_surface = n_points - n_points_uniform
+
+            points_uniform = np.random.rand(n_points_uniform, 3)
+            points_uniform = (scale+padding) * (points_uniform - 0.5)
+
+            points_surface = mesh.sample(n_points_surface)
+            points_surface += np.random.randn(n_points_surface, 3)
+            points = np.concatenate([points_uniform, points_surface], axis=0)
+
+            occupancies = check_mesh_contains(mesh, points)
+
+            colors = np.zeros(shape=(n_points, 3)) + [0, 0, 1]
+            colors[occupancies] = [1,0,0]
 
 
 
+            points = points.astype(dtype)
+            occupancies = np.packbits(occupancies)
+
+            np.savez(m["occ"], points=points, occupancies=occupancies,loc=loc, scale=scale)
+
+            if DEBUG:
+                print('Writing points: %s' % m["occ"])
+                pcd = o3d.geometry.PointCloud()
+                pcd.points = o3d.utility.Vector3dVector(points)
+                pcd.colors = o3d.utility.Vector3dVector(colors)
+                o3d.io.write_point_cloud(str(Path(m["occ"]).with_suffix(".ply")), pcd)
+
+
+if __name__ == '__main__':
+
+    ds = Berger()
+    ds.getModels(scan_conf="0")
+    # ds.standardize()
+    ds.sample(n_points=100000)
