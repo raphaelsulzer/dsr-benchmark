@@ -2,6 +2,8 @@
 
 Data and evaluation code for the paper **A Survey and Benchmark of Automatic Surface Reconstruction from Point Clouds**.
 
+![alt text](teaser.png)
+
 
 ## Data
 
