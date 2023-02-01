@@ -1,6 +1,6 @@
-# A Survey and Benchmark for (Deep) Surface Reconstruction from Point Clouds
+# A Survey and Benchmark for Automatic Surface Reconstruction from Point Clouds
 
-Data and evaluation code for the paper **A Survey and Benchmark for (Deep) Surface Reconstruction from Point Clouds**.
+Data and evaluation code for the paper **A Survey and Benchmark for Automatic Surface Reconstruction from Point Clouds**.
 
 
 ## Data
