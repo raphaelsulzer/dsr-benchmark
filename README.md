@@ -1,6 +1,6 @@
 # A Survey and Benchmark of Automatic Surface Reconstruction from Point Clouds
 
-Data and evaluation code for the paper **A Survey and Benchmark of Automatic Surface Reconstruction from Point Clouds**.
+Data and evaluation code for the paper **A Survey and Benchmark of Automatic Surface Reconstruction from Point Clouds** ([arXiv](https://arxiv.org/abs/2301.13656)).
 
 ![alt text](teaser.png)
 
