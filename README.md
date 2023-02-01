@@ -1,6 +1,6 @@
-# A Survey and Benchmark for Automatic Surface Reconstruction from Point Clouds
+# A Survey and Benchmark of Automatic Surface Reconstruction from Point Clouds
 
-Data and evaluation code for the paper **A Survey and Benchmark for Automatic Surface Reconstruction from Point Clouds**.
+Data and evaluation code for the paper **A Survey and Benchmark of Automatic Surface Reconstruction from Point Clouds**.
 
 
 ## Data
@@ -64,3 +64,20 @@ The range scanning procedure, originally from Berget *et al*., can be found
 To evaluate your method at it to `method/methods.py`
 and at your data to the corresponding experiment paths.
 Then run `run_learning.py` or `run_optim.py` depending on your method.
+
+
+## References
+
+If you find the code or data in this repository useful, please consider citing
+
+```bibtex
+@misc{sulzer2023dsr,
+  doi = {10.48550/ARXIV.2301.13656},
+  url = {https://arxiv.org/abs/2301.13656},
+  author = {Sulzer, Raphael and Landrieu, Loic and Marlet, Renaud and Vallet, Bruno},
+  keywords = {Computer Vision and Pattern Recognition (cs.CV), Computational Geometry (cs.CG), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {A Survey and Benchmark of Automatic Surface Reconstruction from Point Clouds},
+  publisher = {arXiv},
+  year = {2023},
+}
+```
