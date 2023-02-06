@@ -30,13 +30,17 @@ class Berger:
                 categories.remove('')
             self.classes = categories
 
-    def getModels(self,scan_conf=["0","1","2","3","4"],reduce=None,ksr_k=1,abspy_k=1):
+    def getModels(self,scan_conf=["0","1","2","3","4"],reduce=None,ksr_k=1,abspy_k=1,hint=None):
 
 
         self.scan_conf = scan_conf if isinstance(scan_conf, list) else list(scan_conf)
 
         for s in self.scan_conf:
             for c in self.classes:
+
+                if hint is not None:
+                    if hint not in c:
+                        continue
 
                     d = {}
                     d["class"] = s
