@@ -303,9 +303,18 @@ class MeshEvaluator(object):
         with open(filename, 'r') as f:
             return int(f.readline().split()[-1])
 
+    def coacdCells(self,filename):
+        with open(filename, 'r') as f:
+            f.readline()
+            f.readline()
+            return int(f.readline().split(":")[-1])
+
     def getComplexity(self,m,md,method):
-        md["cells"] = self.kgrapchAndObjCells(m[method]["partition"])
-        md["facets"] = self.offFacets(m[method]["surface"])
+        if method == "coacd":
+            md["cells"] = self.coacdCells(m[method]["partition"])
+        else:
+            md["cells"] = self.kgrapchAndObjCells(m[method]["partition"])
+            md["facets"] = self.offFacets(m[method]["surface"])
 
 
 
@@ -331,7 +340,7 @@ class MeshEvaluator(object):
                     files = glob.glob(os.path.join(inpath,m["model"]+"*"))
                 elif method == "P2S~\cite{points2surf}":
                     files = glob.glob(os.path.join(inpath, m["class"]+"_"+m["model"] + "*"))
-                elif method == "ksr" or method == "abspy":
+                elif method == "ksr" or method == "abspy" or method == "coacd":
                     # files = glob.glob(os.path.join(outpath, m["model"], m["class"], "surface*"))
                     files = [m[method]["surface"]]
                 else:
@@ -370,7 +379,7 @@ class MeshEvaluator(object):
                 # if (not md["watertight"]):
                 #     print("\nNon watertight mesh {}/{}".format(m["class"], m["model"]))
 
-                if(method=="abspy" or method == "ksr"):
+                if(method=="abspy" or method == "ksr" or method == "coacd"):
                     self.getComplexity(m,md,method)
 
                 self.eval_dicts.append(md)
@@ -386,8 +395,8 @@ class MeshEvaluator(object):
 
 
             except Exception as e:
-                raise
-                print(e)
+                # raise
+                print("\nERROR: {}".format(e))
                 print("Skipping {}/{}".format(m["class"], m["model"]))
 
                 # return None
@@ -398,9 +407,11 @@ class MeshEvaluator(object):
             op = os.path.join(outpath, "benchmark_full_ksr{}.csv".format(ksr_k))
         elif method == "abspy":
             op = os.path.join(outpath, "benchmark_full_abspy{}.csv".format(abspy_k))
+        elif method == "coacd":
+            op = os.path.join(outpath, "benchmark_full_coacd{}.csv".format(abspy_k))
         os.makedirs(os.path.join(outpath),exist_ok=True)
-        eval_df_full.to_csv(op)
-        eval_df_class = eval_df_full.groupby(by=['class']).mean()
+        eval_df_full.to_csv(op,float_format='%.3g')
+        eval_df_class = eval_df_full.groupby(by=['class']).mean(numeric_only=True)
         eval_df_class.loc['mean'] = eval_df_full.mean(numeric_only=True)
 
         return eval_df_full, eval_df_class

@@ -5,7 +5,7 @@ from tqdm import tqdm
 
 class ShapeNet:
 
-    def __init__(self,path="/mnt/raphael/ShapeNet",
+    def __init__(self,path="/home/rsulzer/data/ShapeNet",
                  classes=[],
                  mesh_tools_dir="/home/raphael/cpp/mesh-tools/build/release"):
 
@@ -30,6 +30,13 @@ class ShapeNet:
         "rifle": "04090263"
         }
 
+        if(not os.path.isfile(os.path.join(self.path, "classes.lst"))):
+            with open(os.path.join(self.path, "classes.lst"), 'w') as f:
+                for v in list(self.metadata.values())[:-1]:
+                    f.write(str(v)+"\n")
+                f.write(str(list(self.metadata.values())[-1]))
+
+
         if not classes:
             with open(os.path.join(self.path, "classes.lst"), 'r') as f:
                 categories = f.read().split('\n')
@@ -41,6 +48,24 @@ class ShapeNet:
             for c in classes:
                 temp.append(self.metadata[c])
             self.classes = temp
+
+
+    def setup(self):
+
+        splits = self.getModels()
+
+        for splits,models in splits.items():
+            for m in models:
+                try:
+                    os.makedirs(os.path.join(m["path"],"eval"),exist_ok=True)
+                    os.rename(os.path.join(m["path"],"pointcloud.npz"),m["pointcloud"])
+                    os.rename(os.path.join(m["path"],"points.npz"),m["occ"])
+
+                    os.makedirs(os.path.join(m["path"],"mesh"),exist_ok=True)
+                    os.rename(os.path.join(self.path,m["class"],"4_watertight_scaled",m["model"]+".off"),m["mesh"])
+                except Exception as e:
+                    print(e)
+                    print("Skipping {}/{}".format(m["class"], m["model"]))
 
 
     def getModels(self,splits=["train","val","test"],scan_conf="4",reduce=None,hint=None):
@@ -67,6 +92,7 @@ class ShapeNet:
                     d = {}
                     d["class"] = c
                     d["model"] = m
+                    d["path"] = os.path.join(self.path,c,m)
                     d["scan"] = os.path.join(self.path,c,m,"scan",str(scan_conf)+".npz")
                     d["scan_ply"] = os.path.join(self.path,c,m,"scan",str(scan_conf)+".ply")
                     d["occ"] = os.path.join(self.path,c,m,"eval","points.npz")
@@ -159,3 +185,11 @@ class ShapeNet:
                 print(*command)
                 p = subprocess.Popen(command)
                 p.wait()
+
+if __name__ == '__main__':
+
+    ds = ShapeNet()
+    ds.setup()
+    # ds.getModels(reduce=0.01)
+    # ds.standardize()
+    # ds.sample(n_points=100000)

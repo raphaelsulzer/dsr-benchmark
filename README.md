@@ -7,15 +7,14 @@ Data and evaluation code for the paper **A Survey and Benchmark of Automatic Sur
 
 ## Data
 
-### Berget *et al*. shapes
+### Berget *et al*.
 
-- The watertight meshes and point clouds can be downloaded [here](https://drive.google.com/file/d/18usEYyY0A1KqbVdbwu7QDA2rH-UNRdsj/view?usp=sharing).
+- The watertight meshes and scans can be downloaded [here](https://drive.google.com/file/d/18usEYyY0A1KqbVdbwu7QDA2rH-UNRdsj/view?usp=sharing).
 
 
 ### ModelNet10
 
-- The ModelNet10 models made watertight using [ManifoldPlus](https://github.com/hjwdzh/ManifoldPlus)
-can be downloaded [here on Zenodo](https://zenodo.org/record/5920479#.YflZilvMLIE).
+- The watertight ModelNet10 models can be downloaded [here on Zenodo](https://zenodo.org/record/5920479#.YflZilvMLIE).
 - The ModelNet10 scans used in our paper can be downloaded
 [here on Zenodo](https://zenodo.org/record/5940164#.YflZolvMLIE). The dataset also includes training and evaluation
 data for ConvONet, Points2Surf, Shape As Points, POCO and DGNN.
@@ -24,6 +23,7 @@ data for ConvONet, Points2Surf, Shape As Points, POCO and DGNN.
 
 - The watertight ShapeNet models can be downloaded [here](https://s3.eu-central-1.amazonaws.com/avg-projects/occupancy_networks/data/watertight.zip) (provided by the authors of [ONet](https://arxiv.org/abs/1812.03828)).
 - Please open an issue if you are interested in the scans used in our paper.
+- Training and evaluation data for ShapeNet can be downloaded [here](https://s3.eu-central-1.amazonaws.com/avg-projects/occupancy_networks/data/dataset_small_v1.1.zip) (provided by the authors of [ONet](https://arxiv.org/abs/1812.03828)).
 
 [//]: # (### Synthetic Rooms Dataset)
 

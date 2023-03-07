@@ -30,10 +30,10 @@ class Berger:
                 categories.remove('')
             self.classes = categories
 
-    def getModels(self,scan_conf=["0","1","2","3","4"],reduce=None,ksr_k=1,abspy_k=1,hint=None):
+    def getModels(self,scan_conf=["0","1","2","3","4"],ksr_k=1,abspy_k=1,hint=None):
 
 
-        self.scan_conf = scan_conf if isinstance(scan_conf, list) else list(scan_conf)
+        self.scan_conf = scan_conf if isinstance(scan_conf, list) else [scan_conf]
 
         for s in self.scan_conf:
             for c in self.classes:
@@ -42,40 +42,44 @@ class Berger:
                     if hint not in c:
                         continue
 
-                    d = {}
-                    d["class"] = s
-                    d["model"] = c
-                    d["scan_conf"] = s
-                    if "mvs" in s:
-                        d["scan"] = os.path.join(self.path,"scan",c,s[3:]+".npz")
-                        d["scan_ply"] = os.path.join(self.path,"scan",c,s[3:]+".ply")
-                    else:
-                        d["scan"] = os.path.join(self.path,"scan","{}_{}.npz".format(c,s))
-                        d["scan_ply"] = os.path.join(self.path,"scan",c,s+".ply")
+                d = {}
+                d["class"] = s
+                d["model"] = c
+                d["scan_conf"] = s
+                d["path"] = self.path
+                if "mvs" in s:
+                    d["scan"] = os.path.join(self.path,"scan",c,s[3:]+".npz")
+                    d["scan_ply"] = os.path.join(self.path,"scan",c,s[3:]+".ply")
+                else:
+                    d["scan"] = os.path.join(self.path,"scan","{}_{}.npz".format(c,s))
+                    d["scan_ply"] = os.path.join(self.path,"scan",c,s+".ply")
 
-                    d["convex_hull"] = os.path.join(self.path,"p2m","convex_hull",s,c+".obj")
-                    d["poisson_6"] = os.path.join(self.path,"p2m","poisson",s,c+".ply")
+                d["convex_hull"] = os.path.join(self.path,"p2m","convex_hull",s,c+".obj")
+                d["poisson_6"] = os.path.join(self.path,"p2m","poisson",s,c+".ply")
 
-                    d["occ"] = os.path.join(self.path,"eval",c,"points.npz")
-                    d["pointcloud"] = os.path.join(self.path,"eval",c,"pointcloud.npz")
+                d["occ"] = os.path.join(self.path,"eval",c,"points.npz")
+                d["pointcloud"] = os.path.join(self.path,"eval",c,"pointcloud.npz")
 
-                    d["pointcloud_ply"] = os.path.join(self.path,"scan_ply","with_normals",c+"_"+s+".ply")
+                d["pointcloud_ply"] = os.path.join(self.path,"scan_ply","with_normals",c+"_"+s+".ply")
 
-                    d["mesh"] = os.path.join(self.path,"mesh",c+"_light.off")
+                d["mesh"] = os.path.join(self.path,"mesh",c+"_light.off")
 
-                    d["planes"] = os.path.join(self.path,"planes",c,s,"planes.vg")
-                    d["ransac"] = os.path.join(self.path,"ransac",c,s,"planes.npz")
+                d["planes"] = os.path.join(self.path,"planes",c,s,"planes.npz")
+                d["ransac"] = os.path.join(self.path,"ransac",c,s,"planes.npz")
 
-                    d["ksr"] = {}
-                    d["ksr"]["surface"] = os.path.join(self.path,"ksr",'{}',c,s,"surface.off").format(ksr_k)
-                    d["ksr"]["partition"] = os.path.join(self.path,"ksr",'{}',c,s,"partition.kgraph").format(ksr_k)
+                d["ksr"] = {}
+                d["ksr"]["surface"] = os.path.join(self.path,"ksr",'{}',c,s,"surface.off").format(ksr_k)
+                d["ksr"]["partition"] = os.path.join(self.path,"ksr",'{}',c,s,"partition.kgraph").format(ksr_k)
 
-                    d["abspy"] = {}
-                    d["abspy"]["surface"] = os.path.join(self.path,"abspy",'{}',c,s,"surface.off").format(abspy_k)
-                    d["abspy"]["partition"] = os.path.join(self.path,"abspy",'{}',c,s,"partition.obj").format(abspy_k)
+                d["abspy"] = {}
+                d["abspy"]["surface"] = os.path.join(self.path,"abspy",'{}',c,s,"surface.off").format(abspy_k)
+                d["abspy"]["partition"] = os.path.join(self.path,"abspy",'{}',c,s,"partition.obj").format(abspy_k)
 
+                d["coacd"] = {}
+                d["coacd"]["partition"] = os.path.join(self.path,"coacd",c,s,"in_cells.ply")
+                d["coacd"]["surface"] = os.path.join(self.path,"coacd",c,s,"in_cells.ply")
 
-                    self.model_dicts.append(d)
+                self.model_dicts.append(d)
 
         return self.model_dicts
 
@@ -265,7 +269,7 @@ class Berger:
 
             a = 5
 
-    def sample(self,n_points=100000):
+    def makeEval(self,n_points=100000,padding=0.1):
 
         print("Sample points on surface and in bounding box for evaluation...\n")
 
@@ -275,9 +279,11 @@ class Berger:
             sys.exit(1)
 
 
-        loc = np.zeros(3)
-        scale = 75.0
-        padding = 0.1*scale
+        # loc = np.zeros(3)
+        # scale = 75.0
+        loc = np.ones(3)+5
+        scale = 1.0
+        padding = padding*scale
 
 
         for m in tqdm(self.model_dicts):
@@ -340,7 +346,11 @@ class Berger:
 
 if __name__ == '__main__':
 
-    ds = Berger()
-    ds.getModels(scan_conf="0")
+    # model = "split_cube"
+    # model = "slanted_cube"
+    # model = "double_slanted_cube"
+    models = ["cube","split_cube","double_split_cube","slanted_cube","double_slanted_cube","complex_cube"]
+    ds = Berger(classes=models)
+    ds.getModels(scan_conf="1")
     # ds.standardize()
-    ds.sample(n_points=100000)
+    ds.makeEval(n_points=100000,padding=0.1)
