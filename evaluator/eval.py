@@ -34,59 +34,13 @@ class MplColorHelper:
         return self.scalarMap.to_rgba(val)
 
 
-def compute_iou(occ1, occ2):
-    ''' Computes the Intersection over Union (IoU) value for two sets of
-    occupancy values.
 
-    Args:
-        occ1 (tensor): first set of occupancy values
-        occ2 (tensor): second set of occupancy values
-    '''
-    # occ1 = np.asarray(occ1)
-    # occ2 = np.asarray(occ2)
 
-    # Put all data in second dimension
-    # Also works for 1-dimensional data
-    if occ1.ndim >= 2:
-        occ1 = occ1.reshape(occ1.shape[0], -1)
-    if occ2.ndim >= 2:
-        occ2 = occ2.reshape(occ2.shape[0], -1)
-
-    # Convert to boolean values
-    occ1 = (occ1 >= 0.5)
-    occ2 = (occ2 >= 0.5)
-
-    # Compute IOU
-    area_union = (occ1 | occ2).astype(np.float32).sum(axis=-1)
-    area_intersect = (occ1 & occ2).astype(np.float32).sum(axis=-1)
-
-    iou = (area_intersect / area_union)
-
-    return iou
-
-# Maximum values for bounding box [-0.5, 0.5]^3
-EMPTY_PCL_DICT = {
-    'completeness': np.sqrt(3),
-    'accuracy': np.sqrt(3),
-    'completeness2': 3,
-    'accuracy2': 3,
-    'chamfer': 6,
-    'hausdorff': 1000,
-    'watertight': 0,
-    'boundary_edges': 0,
-    'non-manifold_edges': 0
-}
-
-EMPTY_PCL_DICT_NORMALS = {
-    'normals completeness': -1.,
-    'normals accuracy': -1.,
-    'normals': -1.,
-}
 
 logger = logging.getLogger(__name__)
 
 
-class MeshEvaluator(object):
+class MeshEvaluator:
     ''' Mesh evaluation class.
 
     It handles the mesh evaluation process.
@@ -97,6 +51,104 @@ class MeshEvaluator(object):
 
     def __init__(self, n_points=100000):
         self.n_points = n_points
+        # Maximum values for bounding box [-0.5, 0.5]^3
+        self.EMPTY_PCL_DICT = {
+            'completeness': np.sqrt(3),
+            'accuracy': np.sqrt(3),
+            'completeness2': 3,
+            'accuracy2': 3,
+            'chamfer': 6,
+            'hausdorff': 1000,
+            'watertight': 0,
+            'boundary_edges': 0,
+            'non-manifold_edges': 0
+        }
+
+        self.EMPTY_PCL_DICT_NORMALS = {
+            'normals completeness': -1.,
+            'normals accuracy': -1.,
+            'normals': -1.,
+        }
+
+    def distance_p2p(self,points_src, normals_src, points_tgt, normals_tgt):
+        ''' Computes minimal distances of each point in points_src to points_tgt.
+
+        Args:
+            points_src (numpy array): source points
+            normals_src (numpy array): source normals
+            points_tgt (numpy array): target points
+            normals_tgt (numpy array): target normals
+        '''
+        kdtree = cKDTree(points_tgt)
+        dist, idx = kdtree.query(points_src)
+
+        if normals_src is not None and normals_tgt is not None:
+            normals_src = \
+                normals_src / np.linalg.norm(normals_src, axis=-1, keepdims=True)
+            normals_tgt = \
+                normals_tgt / np.linalg.norm(normals_tgt, axis=-1, keepdims=True)
+
+            normals_dot_product = (normals_tgt[idx] * normals_src).sum(axis=-1)
+            # Handle normals that point into wrong direction gracefully
+            # (mostly due to mehtod not caring about this in generation)
+            normals_dot_product = np.abs(normals_dot_product)
+        else:
+            normals_dot_product = np.array(
+                [np.nan] * points_src.shape[0], dtype=np.float32)
+        return dist, normals_dot_product
+
+    def distance_p2m(self,points, mesh):
+        ''' Compute minimal distances of each point in points to mesh.
+
+        Args:
+            points (numpy array): points array
+            mesh (trimesh): mesh
+
+        '''
+        _, dist, _ = trimesh.proximity.closest_point(mesh, points)
+        return dist
+
+    def get_threshold_percentage(self,dist, thresholds):
+        ''' Evaluates a point cloud.
+
+        Args:
+            dist (numpy array): calculated distance
+            thresholds (numpy array): threshold values for the F-score calculation
+        '''
+        in_threshold = [
+            (dist <= t).mean() for t in thresholds
+        ]
+        return in_threshold
+
+    def compute_iou(self,occ1, occ2):
+        ''' Computes the Intersection over Union (IoU) value for two sets of
+        occupancy values.
+
+        Args:
+            occ1 (tensor): first set of occupancy values
+            occ2 (tensor): second set of occupancy values
+        '''
+        # occ1 = np.asarray(occ1)
+        # occ2 = np.asarray(occ2)
+
+        # Put all data in second dimension
+        # Also works for 1-dimensional data
+        if occ1.ndim >= 2:
+            occ1 = occ1.reshape(occ1.shape[0], -1)
+        if occ2.ndim >= 2:
+            occ2 = occ2.reshape(occ2.shape[0], -1)
+
+        # Convert to boolean values
+        occ1 = (occ1 >= 0.5)
+        occ2 = (occ2 >= 0.5)
+
+        # Compute IOU
+        area_union = (occ1 | occ2).astype(np.float32).sum(axis=-1)
+        area_intersect = (occ1 & occ2).astype(np.float32).sum(axis=-1)
+
+        iou = (area_intersect / area_union)
+
+        return iou
 
     def eval_mesh(self, mesh, pointcloud_tgt, normals_tgt,
                   points_iou, occ_tgt, remove_wall=False):
@@ -136,7 +188,7 @@ class MeshEvaluator(object):
                 out_dict['non-manifold_edges'] = 0
                 out_dict['watertight'] = 1
                 occ = check_mesh_contains(mesh, points_iou)
-                out_dict['iou'] = compute_iou(occ, occ_tgt)
+                out_dict['iou'] = self.compute_iou(occ, occ_tgt)
                 return  out_dict
 
 
@@ -159,7 +211,7 @@ class MeshEvaluator(object):
             else:
                 out_dict['watertight'] = 1
                 occ = check_mesh_contains(mesh, points_iou)
-                out_dict['iou'] = compute_iou(occ, occ_tgt)
+                out_dict['iou'] = self.compute_iou(occ, occ_tgt)
 
             # out_dict['boundary_edges'] = out_dict['boundary_edges'].shape[0]
             # out_dict['non-manifold_edges'] = out_dict['non-manifold_edges'].shape[0]
@@ -222,9 +274,9 @@ class MeshEvaluator(object):
         # Return maximum losses if pointcloud is empty
         if pointcloud.shape[0] == 0:
             logger.warning('Empty pointcloud / mesh detected!')
-            out_dict = EMPTY_PCL_DICT.copy()
+            out_dict = self.EMPTY_PCL_DICT.copy()
             if normals is not None and normals_tgt is not None:
-                out_dict.update(EMPTY_PCL_DICT_NORMALS)
+                out_dict.update(self.EMPTY_PCL_DICT_NORMALS)
             return out_dict
 
         pointcloud = np.asarray(pointcloud)
@@ -232,7 +284,7 @@ class MeshEvaluator(object):
 
         # Completeness: how far are the points of the target point cloud
         # from the predicted point cloud
-        completeness, completeness_normals = distance_p2p(
+        completeness, completeness_normals = self.distance_p2p(
             pointcloud_tgt, normals_tgt, pointcloud, normals
         )
         # recall = get_threshold_percentage(completeness, thresholds)
@@ -245,7 +297,7 @@ class MeshEvaluator(object):
 
         # Accuracy: how far are the points of the predicted pointcloud
         # from the target pointcloud
-        accuracy, accuracy_normals = distance_p2p(
+        accuracy, accuracy_normals = self.distance_p2p(
             pointcloud, normals, pointcloud_tgt, normals_tgt
         )
         # precision = get_threshold_percentage(accuracy, thresholds)
@@ -303,19 +355,18 @@ class MeshEvaluator(object):
         with open(filename, 'r') as f:
             return int(f.readline().split()[-1])
 
-    def coacdCells(self,filename):
+
+
+    def getPartitionComplexity(self,m,md,method):
+        md["cells"] = self.kgrapchAndObjCells(m[method]["partition"])
+        md["facets"] = self.offFacets(m[method]["surface"])
+
+    def getSurfaceComplexity(self,m,md,method):
+        filename = os.path.join(os.path.dirname(m[method]["partition"]),"in_cells.ply")
         with open(filename, 'r') as f:
             f.readline()
             f.readline()
-            return int(f.readline().split(":")[-1])
-
-    def getComplexity(self,m,md,method):
-        if method == "coacd":
-            md["cells"] = self.coacdCells(m[method]["partition"])
-        else:
-            md["cells"] = self.kgrapchAndObjCells(m[method]["partition"])
-            md["facets"] = self.offFacets(m[method]["surface"])
-
+            md["in_cells"]= int(f.readline().split(":")[-1])
 
 
     def eval(self, models, inpath="", outpath="", transform=False, method="",abspy_k=1,ksr_k=1,export_colored_pc=True):
@@ -376,11 +427,11 @@ class MeshEvaluator(object):
                 md["boundary_edges"] = eval_dict_mesh["boundary_edges"]
                 md["non-manifold_edges"] = eval_dict_mesh["non-manifold_edges"]
                 md["watertight"] = eval_dict_mesh["watertight"]
-                # if (not md["watertight"]):
-                #     print("\nNon watertight mesh {}/{}".format(m["class"], m["model"]))
 
+                if(method=="abspy" or method == "ksr"):
+                    self.getPartitionComplexity(m,md,method)
                 if(method=="abspy" or method == "ksr" or method == "coacd"):
-                    self.getComplexity(m,md,method)
+                    self.getSurfaceComplexity(m,md,method)
 
                 self.eval_dicts.append(md)
 
@@ -395,7 +446,7 @@ class MeshEvaluator(object):
 
 
             except Exception as e:
-                # raise
+                raise
                 print("\nERROR: {}".format(e))
                 print("Skipping {}/{}".format(m["class"], m["model"]))
 
@@ -418,55 +469,3 @@ class MeshEvaluator(object):
 
 
 
-
-def distance_p2p(points_src, normals_src, points_tgt, normals_tgt):
-    ''' Computes minimal distances of each point in points_src to points_tgt.
-
-    Args:
-        points_src (numpy array): source points
-        normals_src (numpy array): source normals
-        points_tgt (numpy array): target points
-        normals_tgt (numpy array): target normals
-    '''
-    kdtree = cKDTree(points_tgt)
-    dist, idx = kdtree.query(points_src)
-
-    if normals_src is not None and normals_tgt is not None:
-        normals_src = \
-            normals_src / np.linalg.norm(normals_src, axis=-1, keepdims=True)
-        normals_tgt = \
-            normals_tgt / np.linalg.norm(normals_tgt, axis=-1, keepdims=True)
-
-        normals_dot_product = (normals_tgt[idx] * normals_src).sum(axis=-1)
-        # Handle normals that point into wrong direction gracefully
-        # (mostly due to mehtod not caring about this in generation)
-        normals_dot_product = np.abs(normals_dot_product)
-    else:
-        normals_dot_product = np.array(
-            [np.nan] * points_src.shape[0], dtype=np.float32)
-    return dist, normals_dot_product
-
-
-def distance_p2m(points, mesh):
-    ''' Compute minimal distances of each point in points to mesh.
-
-    Args:
-        points (numpy array): points array
-        mesh (trimesh): mesh
-
-    '''
-    _, dist, _ = trimesh.proximity.closest_point(mesh, points)
-    return dist
-
-
-def get_threshold_percentage(dist, thresholds):
-    ''' Evaluates a point cloud.
-
-    Args:
-        dist (numpy array): calculated distance
-        thresholds (numpy array): threshold values for the F-score calculation
-    '''
-    in_threshold = [
-        (dist <= t).mean() for t in thresholds
-    ]
-    return in_threshold

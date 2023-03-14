@@ -1,4 +1,3 @@
-from pyntcloud import PyntCloud
 from converter import Converter
 import os
 

@@ -269,6 +269,21 @@ class Berger:
 
             a = 5
 
+    def makePoisson(self, depth=8, boundary=2):
+
+        for m in tqdm(self.model_dicts, ncols=50):
+            # try:
+            command = [self.POISSON_EXE,
+                       "--in", m["scan_ply"],
+                       "--out", os.path.join(self.path, m["class"], m["mesh"]),
+                       "--depth", str(depth),
+                       "--bType", str(boundary)]
+            print("run command: ", *command)
+            p = subprocess.Popen(command)
+            # p = subprocess.Popen(command, shell=False,stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+            p.wait()
+
+
     def makeEval(self,n_points=100000,padding=0.1):
 
         print("Sample points on surface and in bounding box for evaluation...\n")
