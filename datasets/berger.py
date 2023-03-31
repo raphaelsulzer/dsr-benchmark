@@ -30,7 +30,7 @@ class Berger:
                 categories.remove('')
             self.classes = categories
 
-    def getModels(self,scan_conf=["0","1","2","3","4"],ksr_k=1,abspy_k=1,hint=None):
+    def getModels(self,scan_conf=["0","1","2","3","4"],hint=None):
 
 
         self.scan_conf = scan_conf if isinstance(scan_conf, list) else [scan_conf]
@@ -67,13 +67,15 @@ class Berger:
                 d["planes"] = os.path.join(self.path,"planes",c,s,"planes.npz")
                 d["ransac"] = os.path.join(self.path,"ransac",c,s,"planes.npz")
 
+                # d["partition"] = os.path.join(self.path,'{}','{}',c,s,"partition.ply")
+                # d["compact_surface"] = os.path.join(self.path,'{}','{}',c,s,"surface.off")
                 d["ksr"] = {}
-                d["ksr"]["surface"] = os.path.join(self.path,"ksr",'{}',c,s,"surface.off").format(ksr_k)
-                d["ksr"]["partition"] = os.path.join(self.path,"ksr",'{}',c,s,"partition.kgraph").format(ksr_k)
+                d["ksr"]["surface"] = os.path.join(self.path,"ksr",'{}',c,s,"surface.off")
+                d["ksr"]["partition"] = os.path.join(self.path,"ksr",'{}',c,s,"partition.ply")
 
                 d["abspy"] = {}
-                d["abspy"]["surface"] = os.path.join(self.path,"abspy",'{}',c,s,"surface.off").format(abspy_k)
-                d["abspy"]["partition"] = os.path.join(self.path,"abspy",'{}',c,s,"partition.obj").format(abspy_k)
+                d["abspy"]["surface"] = os.path.join(self.path,"abspy",'{}',c,s,"surface.off")
+                d["abspy"]["partition"] = os.path.join(self.path,"abspy",'{}',c,s,"partition.ply")
 
                 d["coacd"] = {}
                 d["coacd"]["partition"] = os.path.join(self.path,"coacd",c,s,"in_cells.ply")

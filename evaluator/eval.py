@@ -150,8 +150,23 @@ class MeshEvaluator:
 
         return iou
 
+    def getSurfaceComplexity(self,model,md,method):
+        filename = model[method["name"]]["surface"].format(method["k"])
+        with open(filename, 'r') as f:
+            f.readline()
+            md["surf_facets"] = int(f.readline().split()[1])
+
+        filename = os.path.join(os.path.dirname(model[method["name"]]["partition"].format(method["k"])),"in_cells.ply")
+        with open(filename, 'r') as f:
+            f.readline()
+            f.readline()
+            md["in_cells"]= int(f.readline().split(":")[-1])
+
+
+
+
     def eval_mesh(self, mesh, pointcloud_tgt, normals_tgt,
-                  points_iou, occ_tgt, remove_wall=False):
+                  points_iou, occ_tgt):
         ''' Evaluates a mesh.
 
         Args:
@@ -225,7 +240,8 @@ class MeshEvaluator:
 
         return out_dict
 
-    def color_pointcloud(self, pointcloud, pointcloud_tgt,normals,normals_tgt,accuracy,completeness,percentile=(2,98)):
+    # def color_pointcloud(self, pointcloud, pointcloud_tgt,normals,normals_tgt,accuracy,completeness,percentile=(2,98)):
+    def color_pointcloud(self, pointcloud, pointcloud_tgt, accuracy, completeness, percentile=(2,98)):
 
         # TODO: eventually it would probably be good to have the same scale per object, even when reconstruct with different methods
         # one simple way would be to concatenate all accuracies (and completeness respectively) per object and then apply
@@ -241,22 +257,19 @@ class MeshEvaluator:
 
         pcda = o3d.geometry.PointCloud()
         pcda.points = o3d.utility.Vector3dVector(pointcloud)
-        pcda.normals = o3d.utility.Vector3dVector(normals)
+        # pcda.normals = o3d.utility.Vector3dVector(normals)
         cols=MplColorHelper(cmap, np.percentile(accuracy,percentile[0]), np.percentile(accuracy,percentile[1])).get_rgb(accuracy)
         # cols=MplColorHelper(cmap, accuracy.min(), accuracy.max()).get_rgb(accuracy)
         pcda.colors = o3d.utility.Vector3dVector(cols[:,:3])
 
         pcdc = o3d.geometry.PointCloud()
         pcdc.points = o3d.utility.Vector3dVector(pointcloud_tgt)
-        pcdc.normals = o3d.utility.Vector3dVector(normals_tgt)
+        # pcdc.normals = o3d.utility.Vector3dVector(normals_tgt)
         cols=MplColorHelper(cmap, np.percentile(completeness,percentile[0]), np.percentile(completeness,percentile[1])).get_rgb(completeness)
         # cols=MplColorHelper(cmap, completeness.min(), completeness.max()).get_rgb(completeness)
         pcdc.colors = o3d.utility.Vector3dVector(cols[:,:3])
 
         return pcda, pcdc
-
-
-
 
 
     def eval_pointcloud(self, pointcloud, pointcloud_tgt,
@@ -332,44 +345,23 @@ class MeshEvaluator:
             # 'completeness2': completeness2,
             # 'accuracy2': accuracy2,
             # 'chamfer-L2': chamferL2,
-            'chamfer-L1': chamferL1 * 100,
-            'hausdorff' : hausdorff * 100
+            'chamfer-L1': chamferL1,
+            'hausdorff' : hausdorff
             # 'f-score': F[9],  # threshold = 1.0%
             # 'f-score-15': F[14],  # threshold = 1.5%
             # 'f-score-20': F[19],  # threshold = 2.0%
         }
 
         if color:
-            out = self.color_pointcloud(pointcloud,pointcloud_tgt,normals,normals_tgt,accuracy,completeness)
+            # out = self.color_pointcloud(pointcloud,pointcloud_tgt,normals,normals_tgt,accuracy,completeness)
+            out = self.color_pointcloud(pointcloud,pointcloud_tgt,accuracy,completeness)
             out_dict["accuracy_pointcloud"] = out[0]
             out_dict["completeness_pointcloud"] = out[1]
 
         return out_dict
 
-    def offFacets(self,filename):
-        with open(filename, 'r') as f:
-            f.readline()
-            return int(f.readline().split()[1])
 
-    def kgrapchAndObjCells(self,filename):
-        with open(filename, 'r') as f:
-            return int(f.readline().split()[-1])
-
-
-
-    def getPartitionComplexity(self,m,md,method):
-        md["cells"] = self.kgrapchAndObjCells(m[method]["partition"])
-        md["facets"] = self.offFacets(m[method]["surface"])
-
-    def getSurfaceComplexity(self,m,md,method):
-        filename = os.path.join(os.path.dirname(m[method]["partition"]),"in_cells.ply")
-        with open(filename, 'r') as f:
-            f.readline()
-            f.readline()
-            md["in_cells"]= int(f.readline().split(":")[-1])
-
-
-    def eval(self, models, inpath="", outpath="", transform=False, method="",abspy_k=1,ksr_k=1,export_colored_pc=True):
+    def eval(self, models, inpath="", outpath="", transform=False, method=None,export=True):
 
         self.eval_dicts=[]
 
@@ -377,7 +369,8 @@ class MeshEvaluator:
             print("ERROR: no models to evaluate")
             return None
 
-        for m in tqdm(models, ncols=50):
+        # for m in tqdm(models, ncols=50):
+        for m in models:
 
             try:
 
@@ -387,13 +380,13 @@ class MeshEvaluator:
                 # else:
                 #     mesh_file = os.path.join(outpath, m["class"], m["model"] + ".off")
                 # mesh_file = os.path.join(outpath, m["class"], m["model"])
-                if method == "POCO~\cite{boulch2022poco}":
+                if method["name"] == "POCO~\cite{boulch2022poco}":
                     files = glob.glob(os.path.join(inpath,m["model"]+"*"))
-                elif method == "P2S~\cite{points2surf}":
+                elif method["name"] == "P2S~\cite{points2surf}":
                     files = glob.glob(os.path.join(inpath, m["class"]+"_"+m["model"] + "*"))
-                elif method == "ksr" or method == "abspy" or method == "coacd":
+                elif method["name"] == "ksr" or method["name"] == "abspy" or method["name"] == "coacd":
                     # files = glob.glob(os.path.join(outpath, m["model"], m["class"], "surface*"))
-                    files = [m[method]["surface"]]
+                    files = [m[method["name"]]["surface"].format(method["k"])]
                 else:
                     files = glob.glob(os.path.join(inpath,m["class"],m["model"]+"*"))
 
@@ -416,6 +409,9 @@ class MeshEvaluator:
                 eval_dict_mesh = self.eval_mesh(
                     mesh, pointcloud_tgt, normals_tgt, points_tgt, occ_tgt)
 
+                ## TODO: need to load the files in here with k from method dict, and not the k that is currently stored in the model dict
+                ## bc that is just the one that was processed most recently
+
                 md = {}
                 md["class"] = m["class"]
                 md["model"] = m["model"]
@@ -428,20 +424,18 @@ class MeshEvaluator:
                 md["non-manifold_edges"] = eval_dict_mesh["non-manifold_edges"]
                 md["watertight"] = eval_dict_mesh["watertight"]
 
-                if(method=="abspy" or method == "ksr"):
-                    self.getPartitionComplexity(m,md,method)
-                if(method=="abspy" or method == "ksr" or method == "coacd"):
+                if(method["name"]=="abspy" or method["name"] == "ksr" or method["name"] == "coacd"):
                     self.getSurfaceComplexity(m,md,method)
 
                 self.eval_dicts.append(md)
 
-                if export_colored_pc:
+                if export:
                     assert(eval_dict_mesh["accuracy_pointcloud"] is not None and eval_dict_mesh["completeness_pointcloud"] is not None)
 
-                    outfile = os.path.join(os.path.dirname(m[method]["surface"]),"accuracy_pc.ply")
+                    outfile = os.path.join(os.path.dirname(m[method["name"]]["surface"].format(method["k"])),"accuracy_pc.ply")
                     o3d.io.write_point_cloud(outfile,eval_dict_mesh["accuracy_pointcloud"])
 
-                    outfile = os.path.join(os.path.dirname(m[method]["surface"]),"completeness_pc.ply")
+                    outfile = os.path.join(os.path.dirname(m[method["name"]]["surface"].format(method["k"])),"completeness_pc.ply")
                     o3d.io.write_point_cloud(outfile,eval_dict_mesh["completeness_pointcloud"])
 
 
@@ -454,12 +448,8 @@ class MeshEvaluator:
 
 
         eval_df_full = pd.DataFrame(self.eval_dicts)
-        if method == "ksr":
-            op = os.path.join(outpath, "benchmark_full_ksr{}.csv".format(ksr_k))
-        elif method == "abspy":
-            op = os.path.join(outpath, "benchmark_full_abspy{}.csv".format(abspy_k))
-        elif method == "coacd":
-            op = os.path.join(outpath, "benchmark_full_coacd{}.csv".format(abspy_k))
+
+        op = os.path.join(outpath, "surface_full_{}{}.csv".format(method["name"],method["k"]))
         os.makedirs(os.path.join(outpath),exist_ok=True)
         eval_df_full.to_csv(op,float_format='%.3g')
         eval_df_class = eval_df_full.groupby(by=['class']).mean(numeric_only=True)

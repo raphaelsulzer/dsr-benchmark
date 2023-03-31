@@ -49,7 +49,7 @@ class simpleShapes:
 
             d["abspy"] = {}
             d["abspy"]["surface"] = os.path.join(self.path,d["class"],m,"abspy",'{}',"surface.off").format(abspy_k)
-            d["abspy"]["partition"] = os.path.join(self.path,d["class"],m,"abspy",'{}',"partition.obj").format(abspy_k)
+            d["abspy"]["partition"] = os.path.join(self.path,d["class"],m,"abspy",'{}',"partition.ply").format(abspy_k)
 
             self.model_dicts.append(d)
 

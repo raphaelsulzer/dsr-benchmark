@@ -10,6 +10,7 @@ import trimesh
 import open3d as o3d
 from glob import glob
 from converter import Converter
+from pathlib import Path
 
 DEBUG = 1
 
@@ -55,21 +56,29 @@ class KSR42:
                 d["occ"] = os.path.join(self.path,c,m,"eval","points.npz")
                 d["pointcloud"] = os.path.join(self.path,c,m,"eval","pointcloud.npz")
 
-                d["pointcloud_ply"] = os.path.join(self.path,c,m,"pointcloud.ply")
-                d["mesh"] = os.path.join(self.path,c,m,"mesh_unit.off")
-                d["ori_mesh"] = os.path.join(self.path,c,m,"mesh.ply")
+                # d["pointcloud_ply"] = os.path.join(self.path,c,m,"pointcloud.ply")
+                # d["mesh"] = os.path.join(self.path,c,m,"mesh_unit.off")
+                d["ori_mesh"] = os.path.join(self.path,c,m,"mesh.off")
                 d["planes"] = os.path.join(self.path,c,m,"planes","planes.npz")
                 d["ransac"] = os.path.join(self.path,c,m,"ransac","planes.npz")
 
                 d["ori_planes"] = glob(os.path.join(self.path,c,m,"*.vg"))[0]
+                d["ori_pointcloud"] = d["ori_planes"].replace("_input.vg",".ply")
+
+                d["pointcloud_ply"] = d["ori_pointcloud"]
+                d["mesh"] = d["ori_mesh"]
 
                 d["ksr"] = {}
-                d["ksr"]["surface"] = os.path.join(self.path,c,m,"ksr",'{}',"surface.off").format(ksr_k)
-                d["ksr"]["partition"] = os.path.join(self.path,c,m,"ksr",'{}',"partition.kgraph").format(ksr_k)
+                d["ksr"]["surface"] = os.path.join(self.path,c,m,"ksr",'{}',"surface.off")
+                d["ksr"]["partition"] = os.path.join(self.path,c,m,"ksr",'{}',"partition.ply")
 
                 d["abspy"] = {}
-                d["abspy"]["surface"] = os.path.join(self.path,c,m,"abspy",'{}',"surface.off").format(abspy_k)
-                d["abspy"]["partition"] = os.path.join(self.path,c,m,"abspy",'{}',"partition.obj").format(abspy_k)
+                d["abspy"]["surface"] = os.path.join(self.path,c,m,"abspy",'{}',"surface.off")
+                d["abspy"]["partition"] = os.path.join(self.path,c,m,"abspy",'{}',"partition.ply")
+
+                d["coacd"] = {}
+                d["coacd"]["surface"] = os.path.join(self.path,c,m,"abspy",'{}',"in_cells.ply")
+                d["coacd"]["partition"] = os.path.join(self.path,c,m,"abspy",'{}',"in_cells.ply")
 
                 self.model_dicts.append(d)
 
@@ -190,6 +199,12 @@ class KSR42:
             pcd = o3d.io.read_point_cloud(m["scan_ply"])
             np.savez(m["scan"], points=np.asarray(pcd.points), normals=np.asarray(pcd.normals))
 
+    def convert_mesh(self):
+
+        for m in tqdm(self.model_dicts):
+            plymesh = str(Path(m["mesh"]).with_suffix(".ply"))
+            mesh = o3d.io.read_triangle_mesh(plymesh)
+            o3d.io.write_triangle_mesh(m["mesh"],mesh)
 
     def sample(self,n_points=100000,unit=True):
 
@@ -277,12 +292,12 @@ class KSR42:
 
 if __name__ == '__main__':
 
-    ds = KSR42()
-    ds.getModels(hint="Castle")
+    ds = KSR42(classes="Simple")
+    ds.getModels()
 
-    # ds.convert()
+    ds.convert_mesh()
 
-    # ds.makePoisson(depth=9)
+    # ds.makePoisson(depth=13)
 
     # ds.standardize()
     ds.sample(n_points=1000000,unit=False)
