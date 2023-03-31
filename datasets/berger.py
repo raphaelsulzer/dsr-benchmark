@@ -1,4 +1,4 @@
-import os, sys, subprocess
+import os, sys, subprocess, pathlib
 sys.path.append(os.path.join(os.path.dirname(__file__)))
 from scan_settings import scan_settings
 import numpy as np
@@ -10,10 +10,15 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from libmesh import check_mesh_contains
 from pathlib import Path
 
+
+
+with open(os.path.join(pathlib.Path(__file__).parent,"DATASETDIR.txt"),'r') as f:
+    DATASETDIR=f.readline()
+
 DEBUG = 1
 class Berger:
 
-    def __init__(self,path="/home/rsulzer/data/reconbench",
+    def __init__(self,path=os.path.join(DATASETDIR,"reconbench"),
                  classes=[],
                  mesh_tools_dir="/home/raphael/cpp/mesh-tools/build/release"
                  ):

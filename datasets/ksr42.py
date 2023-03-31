@@ -1,4 +1,4 @@
-import os, sys, subprocess
+import os, sys, subprocess, pathlib
 sys.path.append(os.path.join(os.path.dirname(__file__)))
 from scan_settings import scan_settings
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
@@ -12,12 +12,15 @@ from glob import glob
 from converter import Converter
 from pathlib import Path
 
+with open(os.path.join(pathlib.Path(__file__).parent,"DATASETDIR.txt"),'r') as f:
+    DATASETDIR=f.readline()
+
 DEBUG = 1
 
 
 class KSR42:
 
-    def __init__(self,path="/home/rsulzer/data/KSR42_dataset",
+    def __init__(self,path=os.path.join(DATASETDIR,"KSR42_dataset"),
                  classes=[], mesh_tools_dir="/home/rsulzer/cpp/mesh-tools/build/release"):
 
         self.POISSON_EXE = "/home/rsulzer/cpp/PoissonRecon/Bin/Linux/PoissonRecon"
