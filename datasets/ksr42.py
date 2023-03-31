@@ -13,7 +13,7 @@ from converter import Converter
 from pathlib import Path
 
 with open(os.path.join(pathlib.Path(__file__).parent,"DATASETDIR.txt"),'r') as f:
-    DATASETDIR=f.readline()
+    DATASETDIR=f.readline().rstrip('\n')
 
 DEBUG = 1
 
