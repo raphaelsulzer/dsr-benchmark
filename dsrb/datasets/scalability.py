@@ -1,4 +1,6 @@
 import os, sys, subprocess, pathlib
+import shutil
+
 sys.path.append(os.path.join(os.path.dirname(__file__)))
 from scan_settings import scan_settings
 import numpy as np
@@ -9,88 +11,104 @@ import open3d as o3d
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from libmesh import check_mesh_contains
 from pathlib import Path
+from glob import glob
+from default_dataset import DATASET
 
-
-
-with open(os.path.join(pathlib.Path(__file__).parent,"DATASETDIR.txt"),'r') as f:
-    DATASETDIR=f.readline().rstrip('\n')
 
 DEBUG = 1
-class Berger:
+class Scalability(DATASET):
 
-    def __init__(self,path=os.path.join(DATASETDIR,"reconbench"),
-                 classes=[],
-                 mesh_tools_dir="/home/raphael/cpp/mesh-tools/build/release"
-                 ):
-        self.path = path
-        self.classes = classes if isinstance(classes,list) else [classes]
+    def __init__(self, models=[], list="models.lst"):
+        super().__init__()
+        self.path = os.path.join(self.path, "scalability_test")
 
         self.model_dicts = []
-        self.mesh_tools_dir = mesh_tools_dir
 
-        if not classes:
-            with open(os.path.join(self.path, "classes.lst"), 'r') as f:
-                categories = f.read().split('\n')
-            if '' in categories:
-                categories.remove('')
-            self.classes = categories
+        if not models:
+            with open(os.path.join(self.path, list), 'r') as f:
+                models = f.read().split('\n')
+            if '' in models:
+                models.remove('')
+            self.models = models
 
-    def getModels(self,scan_conf=["0","1","2","3","4"],hint=None):
+    def getModels(self,scale=["40","100","250","500","1000","2k","10k","50k"],hint=None):
 
 
-        self.scan_conf = scan_conf if isinstance(scan_conf, list) else [scan_conf]
+        self.scale = scale if isinstance(scale, list) else [scale]
 
-        for s in self.scan_conf:
-            for c in self.classes:
+        for s in self.scale:
+            for m in self.models:
 
                 if hint is not None:
-                    if hint not in c:
+                    if hint not in m:
                         continue
 
                 d = {}
-                d["class"] = s
-                d["model"] = c
-                d["scan_conf"] = s
-                d["path"] = self.path
-                if "mvs" in s:
-                    d["scan"] = os.path.join(self.path,"scan",c,s[3:]+".npz")
-                    d["scan_ply"] = os.path.join(self.path,"scan",c,s[3:]+".ply")
+                d["model"] = m
+                if s in ["40","100","250","500","1000"]:
+                    d["n_sample_points"] = 150000
+                elif s in ["2k"]:
+                    d["n_sample_points"] = 250000
+                elif s in ["10k","50k"]:
+                    d["n_sample_points"] = 1000000
                 else:
-                    d["scan"] = os.path.join(self.path,"scan","{}_{}.npz".format(c,s))
-                    d["scan_ply"] = os.path.join(self.path,"scan",c,s+".ply")
+                    raise NotImplementedError
 
-                d["convex_hull"] = os.path.join(self.path,"p2m","convex_hull",s,c+".obj")
-                d["poisson_6"] = os.path.join(self.path,"p2m","poisson",s,c+".ply")
+                d["scale"] = s
+                d["class"] = s
+                d["path"] = self.path
 
-                d["occ"] = os.path.join(self.path,"eval",c,"points.npz")
-                d["pointcloud"] = os.path.join(self.path,"eval",c,"pointcloud.npz")
 
-                d["pointcloud_ply"] = os.path.join(self.path,"scan_ply","with_normals",c+"_"+s+".ply")
+                d["eval"] = dict()
+                d["eval"]["occ"] = os.path.join(self.path,"eval",m,"points.npz")
+                d["eval"]["pointcloud"] = os.path.join(self.path,"eval",m,"pointcloud.npz")
+                d["eval"]["polygons"] = os.path.join(self.path,"eval",m,"polygon_samples.npz")
 
-                d["mesh"] = os.path.join(self.path,"mesh",c+"_light.off")
+                # d["pointcloud_ply"] = os.path.join(self.path,"scan_ply","with_normals",c+"_"+s+".ply")
+                d["pointcloud_ply"] = os.path.join(self.path,"input_pointcloud",m+".ply")
+                d["pointcloud"] = os.path.join(self.path,"input_pointcloud",m+".npz")
 
-                d["planes"] = os.path.join(self.path,"planes",c,s,"planes.npz")
-                d["ransac"] = os.path.join(self.path,"ransac",c,s,"planes.npz")
+                d["mesh"] = os.path.join(self.path,"mesh",m+".off")
+
+                d["planes_vg"] = glob(os.path.join(self.path,"planes",m,"{}_{}".format(m,s),'*.vg'))[0]
+                d["planes"] = str(Path(d["planes_vg"]).with_suffix('.npz'))
+
+                # d["plane_params"] = os.path.join(self.path,"planes",s,m,"params.txt")
+                # d["ransac"] = os.path.join(self.path,"ransac",s,m,"planes.npz")
 
                 # d["partition"] = os.path.join(self.path,'{}','{}',c,s,"partition.ply")
                 # d["compact_surface"] = os.path.join(self.path,'{}','{}',c,s,"surface.off")
                 d["ksr"] = {}
-                d["ksr"]["surface"] = os.path.join(self.path,"ksr",'{}',c,s,"surface.off")
-                d["ksr"]["partition"] = os.path.join(self.path,"ksr",'{}',c,s,"partition.ply")
+                d["ksr"]["surface"] = os.path.join(self.path,"ksr",'{}','{}',s,m,"surface.off")
+                d["ksr"]["partition"] = os.path.join(self.path,"ksr",'{}','{}',s,m,"partition.ply")
 
                 d["abspy"] = {}
-                d["abspy"]["surface"] = os.path.join(self.path,"abspy",'{}',c,s,"surface.off")
-                d["abspy"]["partition"] = os.path.join(self.path,"abspy",'{}',c,s,"partition.ply")
+                d["abspy"]["surface"] = os.path.join(self.path,"abspy",'{}','{}',s,m,"surface.off")
+                d["abspy"]["partition"] = os.path.join(self.path,"abspy",'{}','{}',s,m,"partition.ply")
 
                 d["coacd"] = {}
-                d["coacd"]["partition"] = os.path.join(self.path,"coacd",c,s,"in_cells.ply")
-                d["coacd"]["surface"] = os.path.join(self.path,"coacd",c,s,"in_cells.ply")
+                d["coacd"]["partition"] = os.path.join(self.path,"coacd",s,m,"in_cells.ply")
+                d["coacd"]["surface"] = os.path.join(self.path,"coacd",s,m,"in_cells.ply")
+
+                d["qem"] = {}
+                d["qem"]["partition"] = os.path.join(self.path,"qem",'{}',s,m,"in_cells.ply")
+                d["qem"]["surface"] = os.path.join(self.path,"qem",'{}',s,m,"surface.ply")
 
                 self.model_dicts.append(d)
 
         return self.model_dicts
 
+    def move(self):
 
+        for m in self.model_dicts:
+            try:
+                dir = os.listdir(os.path.join(m["planes"]))[0]
+                shutil.rmtree(os.path.join(m["planes"], dir))
+                for file in glob(os.path.join(m["planes"],dir,'*')):
+                    fname = os.path.split(file)[-1]
+                    # os.rename(file,os.path.join(m["planes"],fname))
+            except Exception as e:
+                print(e)
 
     def scan(self,scan_setting="4",scanner_dir="/home/raphael/cpp/mesh-tools/build/release/scan",
              normal_method='jet', normal_neighborhood=30, normal_orient=1):
@@ -281,8 +299,8 @@ class Berger:
         for m in tqdm(self.model_dicts, ncols=50):
             # try:
             command = [self.POISSON_EXE,
-                       "--in", m["scan_ply"],
-                       "--out", os.path.join(self.path, m["class"], m["mesh"]),
+                       "--in", m["pointcloud_ply"],
+                       "--out", m["mesh"],
                        "--depth", str(depth),
                        "--bType", str(boundary)]
             print("run command: ", *command)
@@ -291,7 +309,22 @@ class Berger:
             p.wait()
 
 
-    def makeEval(self,n_points=100000,padding=0.1):
+
+    def convert_pc(self):
+
+        for m in tqdm(self.model_dicts):
+            pcd = o3d.io.read_point_cloud(m["pointcloud_ply"])
+            np.savez(m["pointcloud"], points=np.asarray(pcd.points), normals=np.asarray(pcd.normals))
+
+    def convert_mesh(self):
+
+        for m in tqdm(self.model_dicts):
+            plymesh = str(m["mesh"]+".ply")
+            mesh = o3d.io.read_triangle_mesh(plymesh)
+            o3d.io.write_triangle_mesh(m["mesh"],mesh)
+
+
+    def make_eval(self,n_points=100000,unit=False,surface=True,occ=True):
 
         print("Sample points on surface and in bounding box for evaluation...\n")
 
@@ -301,69 +334,83 @@ class Berger:
             sys.exit(1)
 
 
-        # loc = np.zeros(3)
-        # scale = 75.0
-        loc = np.ones(3)+5
-        scale = 1.0
-        padding = padding*scale
+
 
 
         for m in tqdm(self.model_dicts):
 
-            dtype = np.float32
+            try:
+
+                # if not unit:
+                #     m["mesh"] = m["ori_mesh"]
+
+                mesh = trimesh.load(m["mesh"])
+                fpath = os.path.dirname(m["eval"]["pointcloud"])
+                os.makedirs(fpath, exist_ok=True)
+
+                if surface:
+
+                    # surface points
+                    points_surface, fid = mesh.sample(n_points,return_index=True)
+                    normals = mesh.face_normals[fid]
+
+                    np.savez(m["eval"]["pointcloud"], points=points_surface, normals=normals)
+
+                    if DEBUG:
+                        print('Writing points: %s' % m["eval"]["pointcloud"])
+                        pcd = o3d.geometry.PointCloud()
+                        pcd.points = o3d.utility.Vector3dVector(points_surface)
+                        pcd.normals = o3d.utility.Vector3dVector(normals)
+                        o3d.io.write_point_cloud(str(Path(m["eval"]["pointcloud"]).with_suffix(".ply")), pcd)
 
 
-            mesh = trimesh.load(m["mesh"])
+                # IoU points
+                if occ:
 
-            # surface points
-            points_surface, fid = mesh.sample(n_points,return_index=True)
-            normals = mesh.face_normals[fid]
+                    n_points_uniform = int(n_points * 0.5)
+                    n_points_surface = n_points - n_points_uniform
 
-            points_surface = points_surface.astype(dtype)
-            normals = normals.astype(dtype)
+                    if not unit:
+                        o3dmesh = o3d.io.read_triangle_mesh(m["mesh"])
+                        o3dmesh = o3dmesh.scale(1.1,o3dmesh.get_center())
+                        min=o3dmesh.get_min_bound()
+                        max=o3dmesh.get_max_bound()
+                        points_uniform = np.random.uniform(low=min,high=max,size=(n_points_uniform,3))
 
-            os.makedirs(os.path.dirname(m["pointcloud"]),exist_ok=True)
-            np.savez(m["pointcloud"], points=points_surface, normals=normals, loc=loc, scale=scale)
-
-            if DEBUG:
-                print('Writing points: %s' % m["pointcloud"])
-                pcd = o3d.geometry.PointCloud()
-                pcd.points = o3d.utility.Vector3dVector(points_surface)
-                pcd.normals = o3d.utility.Vector3dVector(normals)
-                o3d.io.write_point_cloud(str(Path(m["pointcloud"]).with_suffix(".ply")), pcd)
+                    else:
+                        points_uniform = np.random.rand(n_points_uniform, 3)
+                        points_uniform = points_uniform - 0.5
 
 
 
-            # IoU points
+                    points_surface = mesh.sample(n_points_surface)
+                    points_surface += 0.05 * np.random.randn(n_points_surface, 3)
+                    points = np.concatenate([points_uniform, points_surface], axis=0)
 
-            n_points_uniform = int(n_points * 0.5)
-            n_points_surface = n_points - n_points_uniform
+                    occupancies = check_mesh_contains(mesh, points)
 
-            points_uniform = np.random.rand(n_points_uniform, 3)
-            points_uniform = (scale+padding) * (points_uniform - 0.5)
-
-            points_surface = mesh.sample(n_points_surface)
-            points_surface += np.random.randn(n_points_surface, 3)
-            points = np.concatenate([points_uniform, points_surface], axis=0)
-
-            occupancies = check_mesh_contains(mesh, points)
-
-            colors = np.zeros(shape=(n_points, 3)) + [0, 0, 1]
-            colors[occupancies] = [1,0,0]
+                    colors = np.zeros(shape=(n_points, 3)) + [0, 0, 1]
+                    colors[occupancies] = [1,0,0]
 
 
 
-            points = points.astype(dtype)
-            occupancies = np.packbits(occupancies)
+                    dtype = np.float16
+                    points = points.astype(dtype)
+                    occupancies = np.packbits(occupancies)
 
-            np.savez(m["occ"], points=points, occupancies=occupancies,loc=loc, scale=scale)
+                    np.savez(m["eval"]["occ"], points=points, occupancies=occupancies)
 
-            if DEBUG:
-                print('Writing points: %s' % m["occ"])
-                pcd = o3d.geometry.PointCloud()
-                pcd.points = o3d.utility.Vector3dVector(points)
-                pcd.colors = o3d.utility.Vector3dVector(colors)
-                o3d.io.write_point_cloud(str(Path(m["occ"]).with_suffix(".ply")), pcd)
+                    if DEBUG:
+                        print('Writing points: %s' % m["eval"]["occ"])
+                        pcd = o3d.geometry.PointCloud()
+                        pcd.points = o3d.utility.Vector3dVector(points)
+                        pcd.colors = o3d.utility.Vector3dVector(colors)
+                        o3d.io.write_point_cloud(str(Path(m["eval"]["occ"]).with_suffix(".ply")), pcd)
+
+
+            except Exception as e:
+                print(e)
+                print("Problem with {}".format(m["model"]))
 
 
 if __name__ == '__main__':
@@ -371,8 +418,13 @@ if __name__ == '__main__':
     # model = "split_cube"
     # model = "slanted_cube"
     # model = "double_slanted_cube"
-    models = ["cube","split_cube","double_split_cube","slanted_cube","double_slanted_cube","complex_cube"]
-    ds = Berger(classes=models)
-    ds.getModels(scan_conf="1")
-    # ds.standardize()
-    ds.makeEval(n_points=100000,padding=0.1)
+    ds = Scalability()
+    ds.getModels(scale=['40'],hint='hand')
+    # ds.convert_pc()
+    #
+    # ds.makePoisson(depth=10)
+
+    ds.standardize()
+    # ds.make_eval(n_points=100000)
+
+    # ds.move()

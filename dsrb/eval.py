@@ -9,10 +9,11 @@ import pandas as pd
 from tqdm import tqdm
 import glob
 import open3d as o3d
-
+import subprocess
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib import cm
+from plyfile import PlyData
 
 class MplColorHelper:
 
@@ -37,7 +38,6 @@ class MplColorHelper:
 
 
 
-logger = logging.getLogger(__name__)
 
 
 class MeshEvaluator:
@@ -49,26 +49,28 @@ class MeshEvaluator:
         n_points (int): number of points to be used for evaluation
     '''
 
-    def __init__(self, n_points=100000):
+    def __init__(self, n_points=100000, mesh_region_growing=None,logger=None):
         self.n_points = n_points
+        self.mesh_region_growing = mesh_region_growing
+        self.logger = logger if logger else logging.getLogger()
         # Maximum values for bounding box [-0.5, 0.5]^3
-        self.EMPTY_PCL_DICT = {
-            'completeness': np.sqrt(3),
-            'accuracy': np.sqrt(3),
-            'completeness2': 3,
-            'accuracy2': 3,
-            'chamfer': 6,
-            'hausdorff': 1000,
-            'watertight': 0,
-            'boundary_edges': 0,
-            'non-manifold_edges': 0
-        }
-
-        self.EMPTY_PCL_DICT_NORMALS = {
-            'normals completeness': -1.,
-            'normals accuracy': -1.,
-            'normals': -1.,
-        }
+        # self.EMPTY_PCL_DICT = {
+        #     'completeness': np.sqrt(3),
+        #     'accuracy': np.sqrt(3),
+        #     'completeness2': 3,
+        #     'accuracy2': 3,
+        #     'chamfer': 6,
+        #     'hausdorff': 1000,
+        #     'watertight': 0,
+        #     'boundary_edges': 0,
+        #     'non-manifold_edges': 0
+        # }
+        #
+        # self.EMPTY_PCL_DICT_NORMALS = {
+        #     'normals completeness': -1.,
+        #     'normals accuracy': -1.,
+        #     'normals': -1.,
+        # }
 
     def distance_p2p(self,points_src, normals_src, points_tgt, normals_tgt):
         ''' Computes minimal distances of each point in points_src to points_tgt.
@@ -80,7 +82,7 @@ class MeshEvaluator:
             normals_tgt (numpy array): target normals
         '''
         kdtree = cKDTree(points_tgt)
-        dist, idx = kdtree.query(points_src)
+        dist, idx = kdtree.query(points_src) # dist is Euclidean distance, non-negative
 
         if normals_src is not None and normals_tgt is not None:
             normals_src = \
@@ -151,16 +153,36 @@ class MeshEvaluator:
         return iou
 
     def getSurfaceComplexity(self,model,md,method):
-        filename = model[method["name"]]["surface"].format(method["k"])
-        with open(filename, 'r') as f:
-            f.readline()
-            md["surf_facets"] = int(f.readline().split()[1])
+        if method['name'] == 'ksr':
+            pp = method.get("grid", "")
+            if len(pp) > 0:
+                pp = '{}{}{}'.format(pp[0], pp[1], pp[2])
+        else:
+            pp = method.get("prioritise_planes", "")
 
-        filename = os.path.join(os.path.dirname(model[method["name"]]["partition"].format(method["k"])),"in_cells.ply")
-        with open(filename, 'r') as f:
-            f.readline()
-            f.readline()
-            md["in_cells"]= int(f.readline().split(":")[-1])
+
+        if not method["name"] == "coacd":
+            # filename = model[method["name"]]["surface"].format(method["k"],pp)
+            # with open(filename, 'r') as f:
+            #     f.readline()
+            #     md["surf_facets"] = int(f.readline().split()[1])
+
+            filename = os.path.splitext(model[method["name"]]["surface"].format(method["k"],pp))[0]+"_colored.ply"
+            plydata = PlyData.read(filename)
+            md["surf_facets"] = len(plydata["face"]['vertex_indices'])
+
+            filename = model[method["name"]]["surface"].format(method["k"],pp)
+            command = [self.mesh_region_growing, str(filename), str(os.path.dirname(filename))+"/"]
+            print("Run command ", *command)
+            p = subprocess.check_output(command)
+            md["surf_regions"] = int(p.decode("utf-8").split(':')[1])
+
+        if not method["name"] == "qem":
+            filename = os.path.join(os.path.dirname(model[method["name"]]["partition"].format(method["k"],pp)),"in_cells.ply")
+            with open(filename, 'r') as f:
+                f.readline()
+                f.readline()
+                md["in_cells"]= int(f.readline().split(":")[-1])
 
 
 
@@ -178,9 +200,11 @@ class MeshEvaluator:
         '''
         if len(mesh.vertices) != 0 and len(mesh.faces) != 0:
 
-            # if(components > 1):
-            #     mesh = mesh.split()[0]
-            pointcloud, idx = mesh.sample(self.n_points, return_index=True)
+            if self.n_points == "input":
+                n_points = pointcloud_tgt.shape[0]
+                pointcloud, idx = mesh.sample(n_points, return_index=True)
+            else:
+                pointcloud, idx = mesh.sample(self.n_points, return_index=True)
 
             pointcloud = pointcloud.astype(np.float32)
             normals = mesh.face_normals[idx]
@@ -286,11 +310,11 @@ class MeshEvaluator:
         '''
         # Return maximum losses if pointcloud is empty
         if pointcloud.shape[0] == 0:
-            logger.warning('Empty pointcloud / mesh detected!')
-            out_dict = self.EMPTY_PCL_DICT.copy()
-            if normals is not None and normals_tgt is not None:
-                out_dict.update(self.EMPTY_PCL_DICT_NORMALS)
-            return out_dict
+            logger.warning('Empty pointcloud / mesh!')
+            # out_dict = self.EMPTY_PCL_DICT.copy()
+            # if normals is not None and normals_tgt is not None:
+            #     out_dict.update(self.EMPTY_PCL_DICT_NORMALS)
+            return dict()
 
         pointcloud = np.asarray(pointcloud)
         pointcloud_tgt = np.asarray(pointcloud_tgt)
@@ -326,7 +350,7 @@ class MeshEvaluator:
         normals_correctness = (
                 0.5 * completeness_normals + 0.5 * accuracy_normals
         )
-        chamferL1 = 0.5 * (completeness_mean + accuracy_mean)
+        chamfer = 0.5 * (completeness_mean + accuracy_mean)
 
         hausdorff = max(completeness_max,accuracy_max)
 
@@ -336,17 +360,22 @@ class MeshEvaluator:
         #     for i in range(len(precision))
         # ]
 
+        factor=1000
         out_dict = {
-            'completeness': completeness_mean,
-            'accuracy': accuracy_mean,
-            'normals completeness': completeness_normals,
-            'normals accuracy': accuracy_normals,
-            'normals': normals_correctness,
+            'HD_gt->r (x10^3)': completeness_max*factor,
+            'HD_r->gt (x10^3)': accuracy_max*factor,
+            'Hausdorff (x10^3)' : hausdorff*factor,
+            'CD_gt->r (x10^3)': completeness_mean*factor,
+            'CD_r->gt (x10^3)': accuracy_mean*factor,
+            'Chamfer (x10^3)': chamfer*factor
+            # 'completeness': completeness_mean,
+            # 'accuracy': accuracy_mean,
+            # 'normals completeness': completeness_normals,
+            # 'normals accuracy': accuracy_normals,
+            # 'normals': normals_correctness,
             # 'completeness2': completeness2,
             # 'accuracy2': accuracy2,
             # 'chamfer-L2': chamferL2,
-            'chamfer-L1': chamferL1,
-            'hausdorff' : hausdorff
             # 'f-score': F[9],  # threshold = 1.0%
             # 'f-score-15': F[14],  # threshold = 1.5%
             # 'f-score-20': F[19],  # threshold = 2.0%
@@ -369,26 +398,26 @@ class MeshEvaluator:
             print("ERROR: no models to evaluate")
             return None
 
-        # for m in tqdm(models, ncols=50):
         for m in models:
 
             try:
-
-                # gt_mesh = trimesh.load(m["mesh"], process=False)
-                # if os.path.exists(os.path.join(outpath, m["class"], m["model"]+".ply")):
-                #     mesh_file = os.path.join(outpath, m["class"], m["model"]+".ply")
-                # else:
-                #     mesh_file = os.path.join(outpath, m["class"], m["model"] + ".off")
-                # mesh_file = os.path.join(outpath, m["class"], m["model"])
                 if method["name"] == "POCO~\cite{boulch2022poco}":
                     files = glob.glob(os.path.join(inpath,m["model"]+"*"))
                 elif method["name"] == "P2S~\cite{points2surf}":
                     files = glob.glob(os.path.join(inpath, m["class"]+"_"+m["model"] + "*"))
-                elif method["name"] == "ksr" or method["name"] == "abspy" or method["name"] == "coacd":
+                elif method["name"] in ["ksr","abspy","coacd","qem"]:
                     # files = glob.glob(os.path.join(outpath, m["model"], m["class"], "surface*"))
-                    files = [m[method["name"]]["surface"].format(method["k"])]
+                    if method['name'] == 'ksr':
+                        pp = method.get("grid", "")
+                        if len(pp) > 0:
+                            pp = '{}{}{}'.format(pp[0], pp[1], pp[2])
+                    else:
+                        pp = method.get("prioritise_planes", "")
+                    files = [m[method["name"]]["surface"].format(method["k"],pp)]
                 else:
                     files = glob.glob(os.path.join(inpath,m["class"],m["model"]+"*"))
+
+                assert(len(files)>0)
 
                 mesh_files = [file for file in files
                          if os.path.isfile(file)]
@@ -399,32 +428,42 @@ class MeshEvaluator:
                     R = np.array([[-1, 0, 0], [0, 0, 1], [0, 1, 0]], dtype=np.float32)
                     mesh.vertices = np.matmul(mesh.vertices, R)
 
-                pointcloud = np.load(m["pointcloud"])
+                pointcloud = np.load(m["eval"]["pointcloud"])
                 pointcloud_tgt = pointcloud["points"]
                 normals_tgt = pointcloud["normals"]
-                points = np.load(m["occ"])
+                points = np.load(m["eval"]["occ"])
                 points_tgt = points['points']
                 occ_tgt = np.unpackbits(points['occupancies'])
 
                 eval_dict_mesh = self.eval_mesh(
                     mesh, pointcloud_tgt, normals_tgt, points_tgt, occ_tgt)
 
-                ## TODO: need to load the files in here with k from method dict, and not the k that is currently stored in the model dict
-                ## bc that is just the one that was processed most recently
+                ## get AABB of all points to compute AABB diagonal for scaling the n_sample_points_per_area value
+                ppmin = pointcloud_tgt.min(axis=0)
+                ppmax = pointcloud_tgt.max(axis=0)
+                diag = np.linalg.norm(ppmax - ppmin, ord=2, axis=0)
+                scale = diag
 
                 md = {}
                 md["class"] = m["class"]
                 md["model"] = m["model"]
                 md["iou"] = eval_dict_mesh["iou"]
-                md["chamfer"] = eval_dict_mesh["chamfer-L1"]
-                md["hausdorff"] = eval_dict_mesh["hausdorff"]
-                md["normal"] = eval_dict_mesh["normals"]
+                md["Chamfer (x10^3)"] = eval_dict_mesh["Chamfer (x10^3)"] / scale
+                md["CD_gt->r (x10^3)"] = eval_dict_mesh["CD_gt->r (x10^3)"] / scale
+                md["CD_r->gt (x10^3)"] = eval_dict_mesh["CD_r->gt (x10^3)"] / scale
+
+                md["Hausdorff (x10^3)"] = eval_dict_mesh["Hausdorff (x10^3)"] / scale
+                md["HD_gt->r (x10^3)"] = eval_dict_mesh["HD_gt->r (x10^3)"] / scale
+                md["HD_r->gt (x10^3)"] = eval_dict_mesh["HD_r->gt (x10^3)"] / scale
+
                 md["components"] = eval_dict_mesh["components"]
                 md["boundary_edges"] = eval_dict_mesh["boundary_edges"]
                 md["non-manifold_edges"] = eval_dict_mesh["non-manifold_edges"]
                 md["watertight"] = eval_dict_mesh["watertight"]
 
-                if(method["name"]=="abspy" or method["name"] == "ksr" or method["name"] == "coacd"):
+                md["surf_facets"] = mesh.faces.shape[0]
+                md["in_cells"] = 0
+                if(method["name"] in ["ksr","abspy","coacd","qem"]):
                     self.getSurfaceComplexity(m,md,method)
 
                 self.eval_dicts.append(md)
@@ -432,10 +471,16 @@ class MeshEvaluator:
                 if export:
                     assert(eval_dict_mesh["accuracy_pointcloud"] is not None and eval_dict_mesh["completeness_pointcloud"] is not None)
 
-                    outfile = os.path.join(os.path.dirname(m[method["name"]]["surface"].format(method["k"])),"accuracy_pc.ply")
+                    if method['name'] == 'ksr':
+                        pp = method.get("grid", "")
+                        if len(pp) > 0:
+                            pp = '{}{}{}'.format(pp[0], pp[1], pp[2])
+                    else:
+                        pp = method.get("prioritise_planes", "")
+                    outfile = os.path.join(os.path.dirname(m[method["name"]]["surface"].format(method["k"],pp)),"accuracy_pc.ply")
                     o3d.io.write_point_cloud(outfile,eval_dict_mesh["accuracy_pointcloud"])
 
-                    outfile = os.path.join(os.path.dirname(m[method["name"]]["surface"].format(method["k"])),"completeness_pc.ply")
+                    outfile = os.path.join(os.path.dirname(m[method["name"]]["surface"].format(method["k"],pp)),"completeness_pc.ply")
                     o3d.io.write_point_cloud(outfile,eval_dict_mesh["completeness_pointcloud"])
 
 
@@ -449,7 +494,13 @@ class MeshEvaluator:
 
         eval_df_full = pd.DataFrame(self.eval_dicts)
 
-        op = os.path.join(outpath, "surface_full_{}{}.csv".format(method["name"],method["k"]))
+        if method['name'] == 'ksr':
+            pp = method.get("grid", "")
+            if len(pp) > 0:
+                pp = '{}{}{}'.format(pp[0], pp[1], pp[2])
+        else:
+            pp = method.get("prioritise_planes", "")
+        op = os.path.join(outpath, "surface_full_{}{}{}.csv".format(method["name"],method["k"],pp))
         os.makedirs(os.path.join(outpath),exist_ok=True)
         eval_df_full.to_csv(op,float_format='%.3g')
         eval_df_class = eval_df_full.groupby(by=['class']).mean(numeric_only=True)

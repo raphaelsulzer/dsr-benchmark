@@ -1,4 +1,4 @@
-import os, sys, subprocess, pathlib
+import os, sys, subprocess
 sys.path.append(os.path.join(os.path.dirname(__file__)))
 from scan_settings import scan_settings
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
@@ -8,82 +8,50 @@ import numpy as np
 from glob import glob
 import trimesh
 import open3d as o3d
-from glob import glob
-from converter import Converter
-from pathlib import Path
 
-with open(os.path.join(pathlib.Path(__file__).parent,"DATASETDIR.txt"),'r') as f:
-    DATASETDIR=f.readline().rstrip('\n')
-
-DEBUG = 1
+DEBUG = 0
 
 
-class KSR42:
+class simpleShapes:
 
-    def __init__(self,path=os.path.join(DATASETDIR,"KSR42_dataset"),
-                 classes=[], mesh_tools_dir="/home/rsulzer/cpp/mesh-tools/build/release"):
+    def __init__(self,path="/home/rsulzer/data/simpleShapes", mesh_tools_dir="/home/rsulzer/cpp/mesh-tools/build/release"):
 
+        self.path = path
+        self.model_dicts = []
+        self.mesh_tools_dir = mesh_tools_dir
         self.POISSON_EXE = "/home/rsulzer/cpp/PoissonRecon/Bin/Linux/PoissonRecon"
 
 
-        self.path = path
-        self.classes = classes if isinstance(classes,list) else [classes]
+    def getModels(self,hint=None):
 
-        self.model_dicts = []
-        self.mesh_tools_dir = mesh_tools_dir
+        models = np.genfromtxt(os.path.join(self.path,"models.lst"),dtype=str)
+        for m in models:
 
-        if not classes:
-            with open(os.path.join(self.path, "classes.lst"), 'r') as f:
-                categories = f.read().split('\n')
-            if '' in categories:
-                categories.remove('')
-            self.classes = categories
+            if hint is not None:
+                if hint not in m:
+                    continue
 
-    def getModels(self,ksr_k=1,abspy_k=1,hint=None):
+            d = {}
+            d["class"] = ""
+            d["model"] = m
+            d["scan_ply"] = glob(os.path.join(self.path,d["class"],m,'*.ply'))[0]
 
-        for c in self.classes:
+            d["occ"] = os.path.join(self.path,d["class"],m,"eval","points.npz")
+            d["pointcloud"] = os.path.join(self.path,d["class"],m,"eval","pointcloud.npz")
 
-            models = np.genfromtxt(os.path.join(self.path,c,"models.lst"),dtype=str)
-            for m in models:
+            d["pointcloud_ply"] = os.path.join(self.path,d["class"],m,"pointcloud.ply")
+            d["mesh"] = os.path.join(self.path,d["class"],m,"mesh_unit.off")
+            d["planes"] = os.path.join(self.path,d["class"],m,"planes","planes.vg")
 
-                if hint is not None:
-                    if hint not in m:
-                        continue
+            d["ksr"] = {}
+            d["ksr"]["surface"] = os.path.join(self.path,d["class"],m,"ksr",'{}',"surface.off")
+            d["ksr"]["partition"] = os.path.join(self.path,d["class"],m,"ksr",'{}',"partition.kgraph")
 
-                d = {}
-                d["class"] = c
-                d["model"] = m
-                d["scan_ply"] = glob(os.path.join(self.path,c,m,'*.ply'))[0]
-                d["scan"] = os.path.join(self.path,c,m,"pointcloud.npz")
+            d["abspy"] = {}
+            d["abspy"]["surface"] = os.path.join(self.path,d["class"],m,"abspy",'{}',"surface.off")
+            d["abspy"]["partition"] = os.path.join(self.path,d["class"],m,"abspy",'{}',"partition.ply")
 
-                d["occ"] = os.path.join(self.path,c,m,"eval","points.npz")
-                d["pointcloud"] = os.path.join(self.path,c,m,"eval","pointcloud.npz")
-
-                # d["pointcloud_ply"] = os.path.join(self.path,c,m,"pointcloud.ply")
-                # d["mesh"] = os.path.join(self.path,c,m,"mesh_unit.off")
-                d["ori_mesh"] = os.path.join(self.path,c,m,"mesh.off")
-                d["planes"] = os.path.join(self.path,c,m,"planes","planes.npz")
-                d["ransac"] = os.path.join(self.path,c,m,"ransac","planes.npz")
-
-                d["ori_planes"] = glob(os.path.join(self.path,c,m,"*.vg"))[0]
-                d["ori_pointcloud"] = d["ori_planes"].replace("_input.vg",".ply")
-
-                d["pointcloud_ply"] = d["ori_pointcloud"]
-                d["mesh"] = d["ori_mesh"]
-
-                d["ksr"] = {}
-                d["ksr"]["surface"] = os.path.join(self.path,c,m,"ksr",'{}',"surface.off")
-                d["ksr"]["partition"] = os.path.join(self.path,c,m,"ksr",'{}',"partition.ply")
-
-                d["abspy"] = {}
-                d["abspy"]["surface"] = os.path.join(self.path,c,m,"abspy",'{}',"surface.off")
-                d["abspy"]["partition"] = os.path.join(self.path,c,m,"abspy",'{}',"partition.ply")
-
-                d["coacd"] = {}
-                d["coacd"]["surface"] = os.path.join(self.path,c,m,"abspy",'{}',"in_cells.ply")
-                d["coacd"]["partition"] = os.path.join(self.path,c,m,"abspy",'{}',"in_cells.ply")
-
-                self.model_dicts.append(d)
+            self.model_dicts.append(d)
 
         return self.model_dicts
 
@@ -150,13 +118,14 @@ class KSR42:
             # try:
             command = [self.POISSON_EXE,
                        "--in", m["scan_ply"],
-                       "--out", os.path.join(self.path, m["class"], m["ori_mesh"]),
+                       "--out", os.path.join(self.path, m["class"], m["mesh"]),
                        "--depth", str(depth),
                        "--bType", str(boundary)]
             print("run command: ", *command)
             p = subprocess.Popen(command)
             # p = subprocess.Popen(command, shell=False,stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
             p.wait()
+
 
 
     def standardize(self,padding=0.1):
@@ -196,20 +165,9 @@ class KSR42:
             o3d.io.write_point_cloud(m["pointcloud_ply"], pcd)
 
 
-    def convert(self):
 
-        for m in tqdm(self.model_dicts):
-            pcd = o3d.io.read_point_cloud(m["scan_ply"])
-            np.savez(m["scan"], points=np.asarray(pcd.points), normals=np.asarray(pcd.normals))
 
-    def convert_mesh(self):
-
-        for m in tqdm(self.model_dicts):
-            plymesh = str(Path(m["mesh"]).with_suffix(".ply"))
-            mesh = o3d.io.read_triangle_mesh(plymesh)
-            o3d.io.write_triangle_mesh(m["mesh"],mesh)
-
-    def sample(self,n_points=100000,unit=True):
+    def sample(self,n_points=100000):
 
         print("Sample points on surface and in bounding box for evaluation...\n")
 
@@ -219,13 +177,11 @@ class KSR42:
             sys.exit(1)
 
 
-
+        loc = np.zeros(3)
+        scale = 1.0
 
 
         for m in tqdm(self.model_dicts):
-
-            if not unit:
-                m["mesh"] = m["ori_mesh"]
 
             mesh = trimesh.load(m["mesh"])
 
@@ -236,7 +192,7 @@ class KSR42:
             fpath = os.path.join(self.path,m["class"],m["model"],"eval")
             os.makedirs(fpath,exist_ok=True)
             filename = os.path.join(fpath,"pointcloud.npz")
-            np.savez(filename, points=points_surface, normals=normals)
+            np.savez(filename, points=points_surface, normals=normals, loc=loc, scale=scale)
 
             if DEBUG:
                 print('Writing points: %s' % filename)
@@ -252,19 +208,9 @@ class KSR42:
             n_points_uniform = int(n_points * 0.5)
             n_points_surface = n_points - n_points_uniform
 
-            if not unit:
-                o3dmesh = o3d.io.read_triangle_mesh(m["mesh"])
-                o3dmesh = o3dmesh.scale(1.1,o3dmesh.get_center())
-                min=o3dmesh.get_min_bound()
-                max=o3dmesh.get_max_bound()
-                points_uniform = np.random.uniform(low=min,high=max,size=(n_points_uniform,3))
-
-            else:
-                points_uniform = np.random.rand(n_points_uniform, 3)
-                points_uniform = points_uniform - 0.5
-
-
-
+            boxsize = 1
+            points_uniform = np.random.rand(n_points_uniform, 3)
+            points_uniform = boxsize * (points_uniform - 0.5)
             points_surface = mesh.sample(n_points_surface)
             points_surface += 0.05 * np.random.randn(n_points_surface, 3)
             points = np.concatenate([points_uniform, points_surface], axis=0)
@@ -281,7 +227,7 @@ class KSR42:
             occupancies = np.packbits(occupancies)
 
             filename = os.path.join(self.path,m["class"],m["model"],"eval","points.npz")
-            np.savez(filename, points=points, occupancies=occupancies)
+            np.savez(filename, points=points, occupancies=occupancies,loc=loc, scale=scale)
 
             if DEBUG:
                 print('Writing points: %s' % filename)
@@ -295,13 +241,18 @@ class KSR42:
 
 if __name__ == '__main__':
 
-    ds = KSR42(classes="Simple")
+    ds = simpleShapes()
+
     ds.getModels()
 
-    ds.convert_mesh()
-
-    # ds.makePoisson(depth=13)
-
     # ds.standardize()
-    ds.sample(n_points=1000000,unit=False)
-    # ds.makePointcloudPLY(n_points=100000)
+    # ds.sample(n_points=1000000)
+
+    ds.makePointcloudPLY(n_points=100000)
+
+
+
+
+
+
+

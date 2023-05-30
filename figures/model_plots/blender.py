@@ -504,7 +504,7 @@ if __name__ == '__main__':
 
             for me in methods:
                 # continue
-                rr.render_settings(model,input=)
+                rr.render_settings(model,me)
                 method = os.path.basename(me).split('.')[0]
                 print("Process {}/{}".format(model, method))
                 if method == 'input' or method == 'full':
