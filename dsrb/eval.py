@@ -10,7 +10,7 @@ from tqdm import tqdm
 import glob
 import open3d as o3d
 import subprocess
-import matplotlib as mpl
+import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 from matplotlib import cm
 from plyfile import PlyData
@@ -28,7 +28,7 @@ class MplColorHelper:
     def __init__(self, cmap_name, start_val, stop_val):
         self.cmap_name = cmap_name
         self.cmap = plt.get_cmap(cmap_name)
-        self.norm = mpl.colors.Normalize(vmin=start_val, vmax=stop_val)
+        self.norm = mcolors.Normalize(vmin=start_val, vmax=stop_val)
         self.scalarMap = cm.ScalarMappable(norm=self.norm, cmap=self.cmap)
 
     def get_rgb(self, val):
@@ -49,10 +49,15 @@ class MeshEvaluator:
         n_points (int): number of points to be used for evaluation
     '''
 
-    def __init__(self, n_points=100000, mesh_region_growing=None,logger=None):
+    def __init__(self, n_points=100000, mesh_region_growing=None,logger=None, debug_export=False):
         self.n_points = n_points
         self.mesh_region_growing = mesh_region_growing
-        self.logger = logger if logger else logging.getLogger()
+        self.logger = logger if logger else logging.getLogger("SURFACE EVALUATOR")
+        self.debug_export = debug_export
+
+        if self.debug_export:
+            self.logger.warning('\nDebug export activated! Turn off for faster processing.\n')
+
         # Maximum values for bounding box [-0.5, 0.5]^3
         # self.EMPTY_PCL_DICT = {
         #     'completeness': np.sqrt(3),
@@ -168,21 +173,29 @@ class MeshEvaluator:
             #     md["surf_facets"] = int(f.readline().split()[1])
 
             filename = os.path.splitext(model[method["name"]]["surface"].format(method["k"],pp))[0]+"_colored.ply"
-            plydata = PlyData.read(filename)
-            md["surf_facets"] = len(plydata["face"]['vertex_indices'])
+            if os.path.isfile(filename):
+                plydata = PlyData.read(filename)
+                md["surf_facets"] = len(plydata["face"]['vertex_indices'])
 
-            filename = model[method["name"]]["surface"].format(method["k"],pp)
-            command = [self.mesh_region_growing, str(filename), str(os.path.dirname(filename))+"/"]
-            print("Run command ", *command)
-            p = subprocess.check_output(command)
-            md["surf_regions"] = int(p.decode("utf-8").split(':')[1])
+                filename = model[method["name"]]["surface"].format(method["k"],pp)
+                command = [self.mesh_region_growing, str(filename), str(os.path.dirname(filename))+"/"]
+                self.logger.debug("Run command: {}".format(*command))
+                p = subprocess.check_output(command)
+                md["surf_regions"] = int(p.decode("utf-8").split(':')[1])
+            else:
+                self.logger.warning("{} missing for measuring surface complexity".format(filename))
+
 
         if not method["name"] == "qem":
             filename = os.path.join(os.path.dirname(model[method["name"]]["partition"].format(method["k"],pp)),"in_cells.ply")
-            with open(filename, 'r') as f:
-                f.readline()
-                f.readline()
-                md["in_cells"]= int(f.readline().split(":")[-1])
+            if os.path.isfile(filename):
+                with open(filename, 'r') as f:
+                    f.readline()
+                    f.readline()
+                    md["in_cells"]= int(f.readline().split(":")[-1])
+            else:
+                self.logger.warning("{} missing for measuring surface complexity".format(filename))
+
 
 
 
@@ -244,7 +257,7 @@ class MeshEvaluator:
             #     out_dict['boundary_edges'] = out_dict['boundary_edges'][not_in,:]
 
             if(out_dict['boundary_edges']>0):
-                # print("non watertight mesh!")
+                # self.logger.warning("non watertight mesh!")
                 out_dict['watertight'] = 0
                 out_dict['iou'] = 0.0
             else:
@@ -256,7 +269,7 @@ class MeshEvaluator:
             # out_dict['non-manifold_edges'] = out_dict['non-manifold_edges'].shape[0]
 
         else:
-            print("Non valid mesh!!!\n")
+            self.logger.warning("Non valid mesh!!!\n")
             out_dict['boundary_edges'] = 0
             out_dict['non-manifold_edges'] = 0
             out_dict['watertight'] = 0
@@ -395,17 +408,13 @@ class MeshEvaluator:
         self.eval_dicts=[]
 
         if not len(models):
-            print("ERROR: no models to evaluate")
+            self.logger.error("No models to evaluate.")
             return None
 
-        for m in models:
+        for model in models:
 
             try:
-                if method["name"] == "POCO~\cite{boulch2022poco}":
-                    files = glob.glob(os.path.join(inpath,m["model"]+"*"))
-                elif method["name"] == "P2S~\cite{points2surf}":
-                    files = glob.glob(os.path.join(inpath, m["class"]+"_"+m["model"] + "*"))
-                elif method["name"] in ["ksr","abspy","coacd","qem"]:
+                if method["name"] in ["ksr","abspy","coacd","qem"]:
                     # files = glob.glob(os.path.join(outpath, m["model"], m["class"], "surface*"))
                     if method['name'] == 'ksr':
                         pp = method.get("grid", "")
@@ -413,25 +422,27 @@ class MeshEvaluator:
                             pp = '{}{}{}'.format(pp[0], pp[1], pp[2])
                     else:
                         pp = method.get("prioritise_planes", "")
-                    files = [m[method["name"]]["surface"].format(method["k"],pp)]
+                    files = [model[method["name"]]["surface"].format(method["k"],pp)]
                 else:
-                    files = glob.glob(os.path.join(inpath,m["class"],m["model"]+"*"))
+                    files = glob.glob(os.path.join(inpath,model["class"],model["model"]+"*"))
 
                 assert(len(files)>0)
 
-                mesh_files = [file for file in files
-                         if os.path.isfile(file)]
+                # mesh_file = [file for file in files
+                #          if os.path.isfile(file)][0]
+                self.logger.warning("Surface evaluation is done with the in_cells.ply file")
+                mesh_file = os.path.join(os.path.dirname(model[method["name"]]["partition"].format(method["k"], pp)), "in_cells.ply")
 
-                mesh = trimesh.load(mesh_files[0], process=False)
+                mesh = trimesh.load(mesh_file, process=False)
 
                 if(transform):
                     R = np.array([[-1, 0, 0], [0, 0, 1], [0, 1, 0]], dtype=np.float32)
                     mesh.vertices = np.matmul(mesh.vertices, R)
 
-                pointcloud = np.load(m["eval"]["pointcloud"])
+                pointcloud = np.load(model["eval"]["pointcloud"])
                 pointcloud_tgt = pointcloud["points"]
                 normals_tgt = pointcloud["normals"]
-                points = np.load(m["eval"]["occ"])
+                points = np.load(model["eval"]["occ"])
                 points_tgt = points['points']
                 occ_tgt = np.unpackbits(points['occupancies'])
 
@@ -445,8 +456,8 @@ class MeshEvaluator:
                 scale = diag
 
                 md = {}
-                md["class"] = m["class"]
-                md["model"] = m["model"]
+                md["class"] = model["class"]
+                md["model"] = model["model"]
                 md["iou"] = eval_dict_mesh["iou"]
                 md["Chamfer (x10^3)"] = eval_dict_mesh["Chamfer (x10^3)"] / scale
                 md["CD_gt->r (x10^3)"] = eval_dict_mesh["CD_gt->r (x10^3)"] / scale
@@ -462,9 +473,10 @@ class MeshEvaluator:
                 md["watertight"] = eval_dict_mesh["watertight"]
 
                 md["surf_facets"] = mesh.faces.shape[0]
-                md["in_cells"] = 0
-                if(method["name"] in ["ksr","abspy","coacd","qem"]):
-                    self.getSurfaceComplexity(m,md,method)
+                md["surf_regions"] = np.nan
+                md["in_cells"] = np.nan
+
+                self.getSurfaceComplexity(model,md,method)
 
                 self.eval_dicts.append(md)
 
@@ -477,17 +489,18 @@ class MeshEvaluator:
                             pp = '{}{}{}'.format(pp[0], pp[1], pp[2])
                     else:
                         pp = method.get("prioritise_planes", "")
-                    outfile = os.path.join(os.path.dirname(m[method["name"]]["surface"].format(method["k"],pp)),"accuracy_pc.ply")
+                    outfile = os.path.join(os.path.dirname(model[method["name"]]["surface"].format(method["k"],pp)),"accuracy_pc.ply")
                     o3d.io.write_point_cloud(outfile,eval_dict_mesh["accuracy_pointcloud"])
 
-                    outfile = os.path.join(os.path.dirname(m[method["name"]]["surface"].format(method["k"],pp)),"completeness_pc.ply")
+                    outfile = os.path.join(os.path.dirname(model[method["name"]]["surface"].format(method["k"],pp)),"completeness_pc.ply")
                     o3d.io.write_point_cloud(outfile,eval_dict_mesh["completeness_pointcloud"])
 
 
             except Exception as e:
                 raise
-                print("\nERROR: {}".format(e))
-                print("Skipping {}/{}".format(m["class"], m["model"]))
+
+                self.logger.error("{}".format(e))
+                self.logger.error("Skipping {}/{}".format(model["class"], model["model"]))
 
                 # return None
 

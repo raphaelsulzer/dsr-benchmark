@@ -31,7 +31,7 @@ class Scalability(DATASET):
                 models.remove('')
             self.models = models
 
-    def getModels(self,scale=["40","100","250","500","1000","2k","10k","50k"],hint=None):
+    def getModels(self,scale=["40","100","250","500","2k","10k"],hint=None):
 
 
         self.scale = scale if isinstance(scale, list) else [scale]
@@ -376,15 +376,16 @@ class Scalability(DATASET):
                         min=o3dmesh.get_min_bound()
                         max=o3dmesh.get_max_bound()
                         points_uniform = np.random.uniform(low=min,high=max,size=(n_points_uniform,3))
-
+                        bb_diag = np.linalg.norm(min-max)
                     else:
+                        bb_diag = sqrt(3)
                         points_uniform = np.random.rand(n_points_uniform, 3)
                         points_uniform = points_uniform - 0.5
 
 
 
                     points_surface = mesh.sample(n_points_surface)
-                    points_surface += 0.05 * np.random.randn(n_points_surface, 3)
+                    points_surface += 0.05 * bb_diag * np.random.randn(n_points_surface, 3)
                     points = np.concatenate([points_uniform, points_surface], axis=0)
 
                     occupancies = check_mesh_contains(mesh, points)
@@ -419,12 +420,12 @@ if __name__ == '__main__':
     # model = "slanted_cube"
     # model = "double_slanted_cube"
     ds = Scalability()
-    ds.getModels(scale=['40'],hint='hand')
+    ds.getModels(scale=['40'])
     # ds.convert_pc()
     #
     # ds.makePoisson(depth=10)
 
-    ds.standardize()
-    # ds.make_eval(n_points=100000)
+    # ds.standardize()
+    ds.make_eval(n_points=100000)
 
     # ds.move()

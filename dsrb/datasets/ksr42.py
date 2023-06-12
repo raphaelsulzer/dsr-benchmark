@@ -304,15 +304,16 @@ class KSR42(DATASET):
                         min=o3dmesh.get_min_bound()
                         max=o3dmesh.get_max_bound()
                         points_uniform = np.random.uniform(low=min,high=max,size=(n_points_uniform,3))
-
+                        bb_diag = np.linalg.norm(min-max)
                     else:
                         points_uniform = np.random.rand(n_points_uniform, 3)
                         points_uniform = points_uniform - 0.5
+                        bb_diag = sqrt(3)
 
 
 
                     points_surface = mesh.sample(n_points_surface)
-                    points_surface += 0.05 * np.random.randn(n_points_surface, 3)
+                    points_surface += 0.05 * bb_diag * np.random.randn(n_points_surface, 3)
                     points = np.concatenate([points_uniform, points_surface], axis=0)
 
                     occupancies = check_mesh_contains(mesh, points)
