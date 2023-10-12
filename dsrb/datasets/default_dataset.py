@@ -14,23 +14,24 @@ from glob import glob
 from converter import Converter
 from pathlib import Path
 
-with open(os.path.join(pathlib.Path(__file__).parents[4],"DATASETDIR.txt"),'r') as f:
-    DATASETDIR=f.readline().rstrip('\n')
 
-DEBUG = 1
+class DefaultDataset:
 
-
-
-class DATASET:
-
-    def __init__(self,path=DATASETDIR,mesh_tools_dir="/home/rsulzer/cpp/mesh-tools/build/release"):
-
-        self.POISSON_EXE = "/home/rsulzer/cpp/PoissonRecon/Bin/Linux/PoissonRecon"
+    def __init__(self,path=None,
+                 mesh_tools_dir="/home/rsulzer/cpp/mesh-tools/build/release",
+                 poisson_exe = "/home/rsulzer/cpp/PoissonRecon/Bin/Linux/PoissonRecon",
+                 tqdm_enabled=True,
+                 debug_export=False):
 
         self.path = path
 
         self.model_dicts = []
         self.mesh_tools_dir = mesh_tools_dir
+        self.poisson_exe = poisson_exe
+
+        self.debug_export = debug_export
+
+        self.tqdm_disabled = not tqdm_enabled
 
 
 
@@ -66,12 +67,50 @@ class DATASET:
             p.wait()
 
 
-    def estimNormals(self, method='jet', neighborhood=30, orient=1):
+    def sample(self,n_points=1000000):
+
+        for m in tqdm(self.model_dicts, disable=self.tqdm_disabled):
+
+            try:
+                os.makedirs(os.path.dirname(m["pointcloud"]), exist_ok=True)
+                mesh = trimesh.load(m["mesh"])
+                points, fid = mesh.sample(n_points, return_index=True)
+                normals = mesh.face_normals[fid]
+
+                # print('Writing points to: {}'.format(m["pointcloud"]))
+                pcd = o3d.geometry.PointCloud()
+                pcd.points = o3d.utility.Vector3dVector(points)
+                pcd.normals = o3d.utility.Vector3dVector(normals)
+                o3d.io.write_point_cloud(m["pointcloud"], pcd)
+
+            except Exception as e:
+                print(e)
+                print("Problem with {}".format(m["model"]))
+
+
+
+    def make_pointcloud_ply(self,n_points=100000,std_noise=0.0):
+        print("Writing pointclouds for reconstruction input...\n")
+
+        for m in tqdm(self.model_dicts):
+
+            data = np.load(m["pointcloud"])
+
+            ind = np.random.randint(0, data["points"].shape[0], size = (n_points,))
+
+            pcd = o3d.geometry.PointCloud()
+            pcd.points = o3d.utility.Vector3dVector(data["points"][ind])
+            pcd.normals = o3d.utility.Vector3dVector(data["normals"][ind])
+            o3d.io.write_point_cloud(m["pointcloud_ply"], pcd)
+
+
+
+    def estim_normals(self, method='jet', neighborhood=30, orient=1):
         if (len(self.model_dicts) < 1):
             print("\nERROR: run getModels() first!")
             sys.exit(1)
 
-        for m in tqdm(self.model_dicts, ncols=50):
+        for m in tqdm(self.model_dicts, disable=self.tqdm_disabled):
             try:
                 command = [str(os.path.join(self.mesh_tools_dir, "normal")),
                            "-w", str(self.path),
@@ -90,20 +129,14 @@ class DATASET:
                 print("Skipping {}/{}".format(m["class"], m["model"]))
 
     def clean(self):
-
         for m in tqdm(self.model_dicts, ncols=50):
-
-
             try:
-
                 os.remove(str(Path(m["mesh"]).with_suffix(".ply")))
             except:
                 print(m["model"])
                 # raise
 
-    def makePoisson(self, depth=8, boundary=2):
-
-
+    def make_poisson(self, depth=8, boundary=2):
         for m in tqdm(self.model_dicts, ncols=50):
             # try:
             command = [self.POISSON_EXE,
@@ -118,8 +151,11 @@ class DATASET:
 
 
     def standardize(self,padding=0.1):
-
-        for m in tqdm(self.model_dicts):
+        """
+        Standardize mesh so that maximum bounding box side length is 1.
+        :return:
+        """
+        for m in tqdm(self.model_dicts,disable=self.tqdm_disabled):
 
             if os.path.isfile(os.path.splitext(m["mesh"])[0]+"_unit.off"):
                continue
@@ -142,21 +178,29 @@ class DATASET:
             o3d.io.write_triangle_mesh(os.path.splitext(m["mesh"])[0]+"_unit.off",mesh)
 
 
+    def scale(self):
+        """
+        Scale mesh so that bounding box has a diagonal length of 1.
+        :return:
+        """
 
-    def makePointcloudPLY(self,n_points=100000,std_noise=0.0):
+        for m in tqdm(self.model_dicts,disable=self.tqdm_disabled):
 
-        print("Writing pointclouds for reconstruction input...\n")
+            mesh = o3d.io.read_triangle_mesh(m["mesh"])
 
-        for m in tqdm(self.model_dicts):
+            bb = mesh.get_axis_aligned_bounding_box()
+            mesh = mesh.translate(-bb.get_center(),relative=True)
 
-            data = np.load(m["pointcloud"])
+            minb = mesh.get_min_bound()
+            maxb = mesh.get_max_bound()
+            diag = np.linalg.norm(minb-maxb)
 
-            ind = np.random.randint(0, data["points"].shape[0], size = (n_points,))
+            mesh = mesh.scale(1/diag,center=(0,0,0))
 
-            pcd = o3d.geometry.PointCloud()
-            pcd.points = o3d.utility.Vector3dVector(data["points"][ind])
-            pcd.normals = o3d.utility.Vector3dVector(data["normals"][ind])
-            o3d.io.write_point_cloud(m["pointcloud_ply"], pcd)
+            outfile = os.path.join(self.path,"input_unit",os.path.split(m["mesh"])[1])
+            os.makedirs(os.path.dirname(outfile),exist_ok=True)
+            o3d.io.write_triangle_mesh(outfile,mesh)
+
 
 
     def convert(self):
@@ -186,20 +230,11 @@ class DATASET:
 
 
 
-
     def make_eval(self,n_points=100000,unit=False,surface=True,occ=True):
-
         print("Sample points on surface and in bounding box for evaluation...\n")
-
-
         if(len(self.model_dicts) < 1):
             print("\nERROR: run getModels() first!")
             sys.exit(1)
-
-
-
-
-
         for m in tqdm(self.model_dicts):
 
             try:
@@ -219,7 +254,7 @@ class DATASET:
 
                     np.savez(m["eval"]["pointcloud"], points=points_surface, normals=normals)
 
-                    if DEBUG:
+                    if self.debug_export:
                         print('Writing points: %s' % m["eval"]["pointcloud"])
                         pcd = o3d.geometry.PointCloud()
                         pcd.points = o3d.utility.Vector3dVector(points_surface)
@@ -239,15 +274,14 @@ class DATASET:
                         min=o3dmesh.get_min_bound()
                         max=o3dmesh.get_max_bound()
                         points_uniform = np.random.uniform(low=min,high=max,size=(n_points_uniform,3))
-
+                        points_surface = mesh.sample(n_points_surface)
+                        points_surface += 0.05 * np.random.randn(n_points_surface, 3) * np.linalg.norm(min-max)
                     else:
                         points_uniform = np.random.rand(n_points_uniform, 3)
                         points_uniform = points_uniform - 0.5
+                        points_surface = mesh.sample(n_points_surface)
+                        points_surface += 0.05 * np.random.randn(n_points_surface, 3)
 
-
-
-                    points_surface = mesh.sample(n_points_surface)
-                    points_surface += 0.05 * np.random.randn(n_points_surface, 3)
                     points = np.concatenate([points_uniform, points_surface], axis=0)
 
                     occupancies = check_mesh_contains(mesh, points)
@@ -263,38 +297,13 @@ class DATASET:
 
                     np.savez(m["eval"]["occ"], points=points, occupancies=occupancies)
 
-                    if DEBUG:
+                    if self.debug_export:
                         print('Writing points: %s' % m["eval"]["occ"])
                         pcd = o3d.geometry.PointCloud()
                         pcd.points = o3d.utility.Vector3dVector(points)
                         pcd.colors = o3d.utility.Vector3dVector(colors)
                         o3d.io.write_point_cloud(str(Path(m["eval"]["occ"]).with_suffix(".ply")), pcd)
 
-
             except Exception as e:
                 print(e)
                 print("Problem with {}".format(m["model"]))
-
-
-
-if __name__ == '__main__':
-
-    ds = KSR42(classes="Large")
-    ds.getModels(hint="City")
-
-    # ds.move()
-
-    # ds.standardize()
-
-
-    # ds.makePoisson(depth=11)
-    #
-    # ds.convert_mesh()
-    #
-    #
-    # # ds.standardize()
-    # ds.sample(n_points=1000000,unit=False,pointcloud=False)
-
-    # ds.convert()
-
-    ds.make_eval(n_points=5000000,occ=True)

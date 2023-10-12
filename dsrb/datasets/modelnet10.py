@@ -20,7 +20,7 @@ class ModelNet10:
             categories.remove('')
         self.classes = categories
 
-    def getModels(self,splits=["train","test"],scan_conf="43",classes=None,reduce=None):
+    def get_models(self,splits=["train","test"],scan_conf="43",classes=None,reduce=None):
 
 
         if classes is not None:
@@ -97,9 +97,9 @@ class ModelNet10:
 
         return self.model_dicts
 
-    def estimNormals(self, method='jet', neighborhood=30, orient=1):
+    def estimate_normals(self, method='jet', neighborhood=30, orient=1):
         if (len(self.model_dicts) < 1):
-            print("\nERROR: run getModels() first!")
+            print("\nERROR: run get_models() first!")
             sys.exit(1)
 
         for s in self.splits:

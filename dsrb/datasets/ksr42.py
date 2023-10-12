@@ -12,14 +12,14 @@ import trimesh
 # import open3d as o3d
 from glob import glob
 from pathlib import Path
-from default_dataset import DATASET
+from default_dataset import DefaultDataset
 
 
 DEBUG = 1
 
 
 
-class KSR42(DATASET):
+class KSR42(DefaultDataset):
 
     def __init__(self,classes=[]):
         super().__init__()
@@ -34,7 +34,7 @@ class KSR42(DATASET):
                 categories.remove('')
             self.classes = categories
 
-    def getModels(self,list="benchmark.lst",hint=None):
+    def get_models(self,list="benchmark.lst",hint=None):
 
         for c in self.classes:
 
@@ -104,7 +104,7 @@ class KSR42(DATASET):
              normal_method='jet', normal_neighborhood=30, normal_orient=1):
 
         if(len(self.model_dicts) < 1):
-            print("\nERROR: run getModels() first!")
+            print("\nERROR: run get_models() first!")
             sys.exit(1)
 
         scan = scan_settings[scan_setting]
@@ -131,9 +131,9 @@ class KSR42(DATASET):
             p.wait()
 
 
-    def estimNormals(self, method='jet', neighborhood=30, orient=1):
+    def estimate_normals(self, method='jet', neighborhood=30, orient=1):
         if (len(self.model_dicts) < 1):
-            print("\nERROR: run getModels() first!")
+            print("\nERROR: run get_models() first!")
             sys.exit(1)
 
         for m in tqdm(self.model_dicts, ncols=50):
@@ -166,7 +166,7 @@ class KSR42(DATASET):
                 print(m["model"])
                 # raise
 
-    def makePoisson(self, depth=8, boundary=2):
+    def make_poisson(self, depth=8, boundary=2):
 
 
         for m in tqdm(self.model_dicts, ncols=50):
@@ -208,7 +208,7 @@ class KSR42(DATASET):
 
 
 
-    def makePointcloudPLY(self,n_points=100000,std_noise=0.0):
+    def make_pointcloud_ply(self,n_points=100000,std_noise=0.0):
 
         print("Writing pointclouds for reconstruction input...\n")
 
@@ -258,7 +258,7 @@ class KSR42(DATASET):
 
 
         if(len(self.model_dicts) < 1):
-            print("\nERROR: run getModels() first!")
+            print("\nERROR: run get_models() first!")
             sys.exit(1)
 
 
@@ -346,14 +346,14 @@ class KSR42(DATASET):
 if __name__ == '__main__':
 
     ds = KSR42(classes="Large")
-    ds.getModels(hint="City")
+    ds.get_models(hint="City")
 
     # ds.move()
 
     # ds.standardize()
 
 
-    # ds.makePoisson(depth=11)
+    # ds.make_poisson(depth=11)
     #
     # ds.convert_mesh()
     #

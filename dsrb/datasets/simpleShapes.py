@@ -12,7 +12,7 @@ import open3d as o3d
 DEBUG = 0
 
 
-class simpleShapes:
+class SimpleShapes:
 
     def __init__(self,path="/home/rsulzer/data/simpleShapes", mesh_tools_dir="/home/rsulzer/cpp/mesh-tools/build/release"):
 

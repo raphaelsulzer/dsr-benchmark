@@ -3,6 +3,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__)))
 from scan_settings import scan_settings
 from tqdm import tqdm
 
+
 class ShapeNet:
 
     def __init__(self,path="/home/rsulzer/data/ShapeNet",
@@ -52,7 +53,7 @@ class ShapeNet:
 
     def setup(self):
 
-        splits = self.getModels()
+        splits = self.get_models()
 
         for splits,models in splits.items():
             for m in models:
@@ -67,8 +68,7 @@ class ShapeNet:
                     print(e)
                     print("Skipping {}/{}".format(m["class"], m["model"]))
 
-
-    def getModels(self,splits=["train","val","test"],scan_conf="4",reduce=None,hint=None):
+    def get_models(self,splits=["train","val","test"],scan_conf="4",reduce=None,hint=None):
         self.scan_conf = scan_conf
         self.splits = splits
         for s in splits:
@@ -81,7 +81,7 @@ class ShapeNet:
                     models.remove('')
 
                 if reduce:
-                    models = models[:int(len(models)*reduce)]
+                    models = models[:reduce]
 
                 for m in models:
 
@@ -95,8 +95,9 @@ class ShapeNet:
                     d["path"] = os.path.join(self.path,c,m)
                     d["scan"] = os.path.join(self.path,c,m,"scan",str(scan_conf)+".npz")
                     d["scan_ply"] = os.path.join(self.path,c,m,"scan",str(scan_conf)+".ply")
-                    d["occ"] = os.path.join(self.path,c,m,"eval","points.npz")
-                    d["pointcloud"] = os.path.join(self.path,c,m,"eval","pointcloud.npz")
+                    d["eval"] = dict()
+                    d["eval"]["occ"] = os.path.join(self.path,c,m,"eval","points.npz")
+                    d["eval"]["pointcloud"] = os.path.join(self.path,c,m,"eval","pointcloud.npz")
                     d["mesh"] = os.path.join(self.path,c,m,"mesh","mesh.off")
                     class_list.append(d)
 
@@ -104,10 +105,27 @@ class ShapeNet:
 
         return self.model_dicts
 
-    def getById(self,id="0000"):
+    def get_by_id(self,id="0000"):
 
         if not self.model_dicts:
-            print("Call getModels() first")
+            print("Call get_models() first")
+            return None
+
+        for split in self.model_dicts:
+            
+            m = next((item for item in self.model_dicts[split] if item["model"] == id), None)
+
+        if m is not None:
+            return m
+        else:
+            print("Model with ID {} does not exist".format(id))
+            return None
+
+
+    def get_random(self, id="0000"):
+
+        if not self.model_dicts:
+            print("Call get_models() first")
             return None
 
         m = next((item for item in self.model_dicts if item["model"] == id), None)
@@ -118,24 +136,9 @@ class ShapeNet:
             print("Model with ID {} does not exist".format(id))
             return None
 
-
-    def getRandom(self, id="0000"):
-
-        if not self.model_dicts:
-            print("Call getModels() first")
-            return None
-
-        m = next((item for item in self.model_dicts if item["model"] == id), None)
-
-        if m is not None:
-            return m
-        else:
-            print("Model with ID {} does not exist".format(id))
-            return None
-
-    def estimNormals(self,method='jet',neighborhood=30,orient=1):
+    def estim_normals(self,method='jet',neighborhood=30,orient=1):
         if(len(self.model_dicts) < 1):
-            print("\nERROR: run getModels() first!")
+            print("\nERROR: run get_models() first!")
             sys.exit(1)
 
         for s in self.splits:
@@ -161,7 +164,7 @@ class ShapeNet:
     def scan(self,scan_setting="4"):
 
         if(len(self.model_dicts) < 1):
-            print("\nERROR: run getModels() first!")
+            print("\nERROR: run get_models() first!")
             sys.exit(1)
 
         scan = scan_settings[scan_setting]
@@ -190,6 +193,6 @@ if __name__ == '__main__':
 
     ds = ShapeNet()
     ds.setup()
-    # ds.getModels(reduce=0.01)
+    # ds.get_models(reduce=0.01)
     # ds.standardize()
     # ds.sample(n_points=100000)
