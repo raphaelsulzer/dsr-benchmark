@@ -1,22 +1,21 @@
 import os, sys, subprocess, pathlib
 import shutil
 
-sys.path.append(os.path.join(os.path.dirname(__file__)))
+import pandas as pd
 from scan_settings import scan_settings
 import numpy as np
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from tqdm import tqdm
 import trimesh
 import open3d as o3d
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from libmesh import check_mesh_contains
 from pathlib import Path
 from glob import glob
-from default_dataset import DATASET
-
+from default_dataset import DefaultDataset
+from copy import deepcopy
+from collections import defaultdict
 
 DEBUG = 1
-class Scalability(DATASET):
+class ScalabilityDataset(DefaultDataset):
 
     def __init__(self, models=[], list="models.lst"):
         super().__init__()
@@ -31,28 +30,32 @@ class Scalability(DATASET):
                 models.remove('')
             self.models = models
 
-    def getModels(self,scale=["40","100","250","500","2k","10k"],hint=None):
+    def get_models(self,scales=["40","100","250","500","2k","10k"],names=None):
 
+        if not isinstance(names,list) and names is not None:
+            names = [names]
 
-        self.scale = scale if isinstance(scale, list) else [scale]
+        if not isinstance(scales,list):
+            scales = [scales]
 
-        for s in self.scale:
+        for s in scales:
+            if not isinstance(s,str): s = str(s)
             for m in self.models:
 
-                if hint is not None:
-                    if hint not in m:
+                if names is not None:
+                    if m not in names:
                         continue
 
                 d = {}
                 d["model"] = m
-                if s in ["40","100","250","500","1000"]:
-                    d["n_sample_points"] = 150000
-                elif s in ["2k"]:
-                    d["n_sample_points"] = 250000
-                elif s in ["10k","50k"]:
-                    d["n_sample_points"] = 1000000
-                else:
-                    raise NotImplementedError
+                # if s in ["40","100","250","500","1000"]:
+                #     d["n_sample_points"] = 150000
+                # elif s in ["2k"]:
+                #     d["n_sample_points"] = 250000
+                # elif s in ["10k","50k"]:
+                #     d["n_sample_points"] = 1000000
+                # else:
+                #     raise NotImplementedError
 
                 d["scale"] = s
                 d["class"] = s
@@ -70,8 +73,12 @@ class Scalability(DATASET):
 
                 d["mesh"] = os.path.join(self.path,"mesh",m+".off")
 
-                d["planes_vg"] = glob(os.path.join(self.path,"planes",m,"{}_{}".format(m,s),'*.vg'))[0]
-                d["planes"] = str(Path(d["planes_vg"]).with_suffix('.npz'))
+                # d["planes_vg"] = glob(os.path.join(self.path,"planes",m,"{}_{}".format(m,s),'*.vg'))[0]
+
+                d["planes"] = os.path.join(self.path,"planes",s,m+".npz")
+                d["planes_ply"] = os.path.join(self.path,"planes",s,m+".ply")
+                d["plane_params"] = os.path.join(self.path,"planes",s,m+".json")
+
 
                 # d["plane_params"] = os.path.join(self.path,"planes",s,m,"params.txt")
                 # d["ransac"] = os.path.join(self.path,"ransac",s,m,"planes.npz")
@@ -142,7 +149,7 @@ class Scalability(DATASET):
 
 
 
-    def scanBerger(self,args):
+    def scan_berger(self,args):
         import configparser
 
         # make the scans
@@ -245,9 +252,9 @@ class Scalability(DATASET):
 
 
 
-    def estimNormals(self, method='jet', neighborhood=30, orient=1):
+    def estimate_normals(self, method='jet', neighborhood=30, orient=1):
         if (len(self.model_dicts) < 1):
-            print("\nERROR: run getModels() first!")
+            print("\nERROR: run get_models() first!")
             sys.exit(1)
 
         for m in tqdm(self.model_dicts, ncols=50):
@@ -268,7 +275,7 @@ class Scalability(DATASET):
                 print(e)
                 print("Skipping {}/{}".format(m["class"], m["model"]))
 
-    def orientNormals(self):
+    def orient_normals(self):
 
         for m in tqdm(self.model_dicts, ncols=50):
             scan = np.load(m["scan"])
@@ -294,7 +301,7 @@ class Scalability(DATASET):
 
             a = 5
 
-    def makePoisson(self, depth=8, boundary=2):
+    def make_poisson(self, depth=8, boundary=2):
 
         for m in tqdm(self.model_dicts, ncols=50):
             # try:
@@ -332,10 +339,6 @@ class Scalability(DATASET):
         if(len(self.model_dicts) < 1):
             print("\nERROR: run getModels() first!")
             sys.exit(1)
-
-
-
-
 
         for m in tqdm(self.model_dicts):
 
@@ -413,19 +416,147 @@ class Scalability(DATASET):
                 print(e)
                 print("Problem with {}".format(m["model"]))
 
+    def detect_planes(self,params):
+
+        from pypsdr import psdr
+        import json
+
+        for model in self.model_dicts:
+
+            print("Process {}/{}".format(model["class"],model["model"]))
+
+            par = deepcopy(params)
+            ## get bounding box diagonal
+            pcd = o3d.io.read_point_cloud(model["pointcloud_ply"])
+            diag = np.linalg.norm(pcd.get_min_bound() - pcd.get_max_bound())
+            par["epsilon"] *= diag
+            ## extract planes
+            psd = psdr(1)
+            psd.load_points(np.asarray(pcd.points), np.asarray(pcd.normals))
+            psd.detect(**par)
+            # psd.set_discretization()
+            psd.refine(max_seconds=7200)
+            psd.save(model["planes"])
+            psd.save(model["planes_ply"])
+
+
+            with open(model["plane_params"], "w") as outfile:
+                # json_data refers to the above JSON
+                json.dump(params, outfile)
+
+    def plot_plane_params(self):
+
+        df = pd.DataFrame()
+        for model in self.model_dicts:
+            if os.path.isfile(model["planes"]):
+                data = np.load(model["planes"])
+                df.loc[model["model"],model["class"]] = len(data["group_parameters"])
+            else:
+                df.loc[model["model"],model["class"]] = -99
+
+
+        print(df)
+
+
 
 if __name__ == '__main__':
 
-    # model = "split_cube"
-    # model = "slanted_cube"
-    # model = "double_slanted_cube"
-    ds = Scalability()
-    ds.getModels(scale=['40'])
-    # ds.convert_pc()
-    #
-    # ds.makePoisson(depth=10)
+    ds = ScalabilityDataset()
+    # ds.get_models(scales='250',names=["temple"])
+    ds.get_models(scales='20k',names=["chicago"])
+    # ds.get_models()
 
-    # ds.standardize()
-    ds.make_eval(n_points=100000)
 
-    # ds.move()
+    # ds.make_eval(n_points=100000)
+    # ds.sample(n_points=2000000)
+
+
+    # 40
+    # params = {"min_inliers": 4000, "epsilon": 0.02, "normal_th": 0.5}
+    # Horse
+    # params = {"min_inliers": 3800, "epsilon": 0.02, "normal_th": 0.6}
+    # droid
+    # params = {"min_inliers": 6500, "epsilon": 0.08, "normal_th": 0.48}
+    # sazabi
+    # params = {"min_inliers": 6500, "epsilon": 0.07, "normal_th": 0.49}
+    # temple
+    params = {"min_inliers": 8000, "epsilon": 0.085, "normal_th": 0.48}
+    # city
+    # params = {"min_inliers": 10000, "epsilon": 0.9, "normal_th": 0.5}
+
+    # 100
+    # params = {"min_inliers": 1000, "epsilon": 0.015, "normal_th": 0.6}
+    # Horse
+    # params = {"min_inliers": 900, "epsilon": 0.015, "normal_th": 0.65}
+    # forbidden tower
+    # params = {"min_inliers": 1500, "epsilon": 0.018, "normal_th": 0.6}
+    # droid
+    # params = {"min_inliers": 2500, "epsilon": 0.04, "normal_th": 0.55}
+    # sazabi
+    # params = {"min_inliers": 3000, "epsilon": 0.045, "normal_th": 0.55}
+    # temple
+    # params = {"min_inliers": 4000, "epsilon": 0.055, "normal_th": 0.55}
+
+    # 250
+    # params = {"min_inliers": 300, "epsilon": 0.01, "normal_th": 0.75}
+    # Lucy
+    # params = {"min_inliers": 400, "epsilon": 0.012, "normal_th": 0.70}
+    # forbidden tower
+    # params = {"min_inliers": 800, "epsilon": 0.015, "normal_th": 0.65}
+    # droid
+    # params = {"min_inliers": 1500, "epsilon": 0.018, "normal_th": 0.6}
+    # sazabi
+    # params = {"min_inliers": 1200, "epsilon": 0.022, "normal_th": 0.6}
+    # temple
+    params = {"min_inliers": 1400, "epsilon": 0.022, "normal_th": 0.65}
+
+    # # 500
+    # params = {"min_inliers": 100, "epsilon": 0.008, "normal_th": 0.80}
+    # lucy
+    # params = {"min_inliers": 150, "epsilon": 0.01, "normal_th": 0.80}
+    # forbidden tower
+    # params = {"min_inliers": 600, "epsilon": 0.012, "normal_th": 0.80}
+    # droid
+    # params = {"min_inliers": 600, "epsilon": 0.014, "normal_th": 0.75}
+    # sazabi
+    # params = {"min_inliers": 600, "epsilon": 0.012, "normal_th": 0.70}
+    # temple
+    # params = {"min_inliers": 900, "epsilon": 0.016, "normal_th": 0.7}
+
+    # # # 2000
+    # params = {"min_inliers": 30, "epsilon": 0.004, "normal_th": 0.90}
+    # armadillo, Horse, tarbosaurus
+    # params = {"min_inliers": 25, "epsilon": 0.003, "normal_th": 0.90}
+    # forbidden tower
+    # params = {"min_inliers": 150, "epsilon": 0.005, "normal_th": 0.90}
+    # droid
+    # params = {"min_inliers": 60, "epsilon": 0.0045, "normal_th": 0.85}
+    # sazabi
+    # params = {"min_inliers": 120, "epsilon": 0.006, "normal_th": 0.85}
+    # temple
+    # params = {"min_inliers": 180, "epsilon": 0.0075, "normal_th": 0.8}
+
+    # # # 10000
+    # params = {"min_inliers": 8, "epsilon": 0.001, "normal_th": 0.96}
+    # Horse, armadillo, tarbosaurus
+    # params = {"min_inliers": 7, "epsilon": 0.0008, "normal_th": 0.96}
+    # forbidden tower
+    # params = {"min_inliers": 15, "epsilon": 0.0012, "normal_th": 0.9}
+    # droid
+    # params = {"min_inliers": 7, "epsilon": 0.0008, "normal_th": 0.96}
+    # sazabi
+    # params = {"min_inliers": 12, "epsilon": 0.0018, "normal_th": 0.92}
+    # temple
+    # params = {"min_inliers": 12, "epsilon": 0.0018, "normal_th": 0.92}
+    # city
+    # params = {"min_inliers": 12, "epsilon": 0.0018, "normal_th": 0.92}
+
+
+    # 20k
+    # city
+    params = {"min_inliers": 10, "epsilon": 0.0005, "normal_th": 0.95}
+
+
+    ds.detect_planes(params)
+
+    ds.plot_plane_params()

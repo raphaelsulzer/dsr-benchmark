@@ -1,23 +1,18 @@
-import os, sys, subprocess, pathlib
-import shutil
-
-sys.path.append(os.path.join(os.path.dirname(__file__)))
-from scan_settings import scan_settings
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+import os, sys, subprocess, pathlib, shutil, trimesh
 from libmesh import check_mesh_contains
 from tqdm import tqdm
 import numpy as np
 from glob import glob
-import trimesh
 import open3d as o3d
 from glob import glob
 from converter import Converter
 from pathlib import Path
+import matplotlib.colors as mcolors
 
 
 class DefaultDataset:
 
-    def __init__(self,path=None,
+    def __init__(self,path="/home/rsulzer/data",
                  mesh_tools_dir="/home/rsulzer/cpp/mesh-tools/build/release",
                  poisson_exe = "/home/rsulzer/cpp/PoissonRecon/Bin/Linux/PoissonRecon",
                  tqdm_enabled=True,
@@ -81,7 +76,9 @@ class DefaultDataset:
                 pcd = o3d.geometry.PointCloud()
                 pcd.points = o3d.utility.Vector3dVector(points)
                 pcd.normals = o3d.utility.Vector3dVector(normals)
-                o3d.io.write_point_cloud(m["pointcloud"], pcd)
+                o3d.io.write_point_cloud(m["pointcloud_ply"], pcd)
+
+                np.savez(m["pointcloud"],points=points,normals=normals)
 
             except Exception as e:
                 print(e)
@@ -307,3 +304,53 @@ class DefaultDataset:
             except Exception as e:
                 print(e)
                 print("Problem with {}".format(m["model"]))
+
+    def recolor_mesh(self):
+
+        for model in tqdm(self.models, disable=self.tqdm_disabled):
+
+            in_mesh_file = os.path.join(out_path, model["class"], model["model"], "in_cells.ply")
+
+            if not os.path.isfile(in_mesh_file):
+                print("{} does not exist".format(in_mesh_file))
+                continue
+
+            out_mesh_file = os.path.join(out_path, model["class"], model["model"], "in_cells_recolored.ply")
+
+            mesh = vedo.load(in_mesh_file)
+            mesh, n = self.color_mesh_by_component(mesh)
+            vedo.io.write(mesh, out_mesh_file, binary=False)
+
+    def recolor_planes(self, colors = None):
+
+        from pycompod import PlaneExporter
+
+        # standard colors:
+        # https://coolors.co/ff0000-f4ec00-01ffff-ff7f00-0000ff-00ff01-6f00d8-ff00ff
+        if colors is None:
+            colors = ["#ff0000", "#f4ec00", "#01ffff", "#ff7f00", "#0000ff", "#00ff01", "#6f00d8", "#ff00ff"]
+
+        rgb_colors = []
+        for col in colors:
+            col = mcolors.to_rgb(col)
+            col = (np.array(col) * 255).astype(int)
+            rgb_colors.append(col)
+        rgb_colors = np.array(rgb_colors)
+
+        pe = PlaneExporter()
+        for model in tqdm(self.model_dicts):
+
+            if not os.path.isfile(model["planes"]):
+                print("{} not found".format(model["planes"]))
+                continue
+
+            data = np.load(model["planes"])
+            data = dict(data)
+            nplanes = len(data["group_parameters"])
+            colors = np.random.choice(len(rgb_colors), nplanes)
+            data["colors"] = rgb_colors[colors]
+            plane_file = model["planes"][:-4]+"_recolored.ply"
+            pt_file = model["planes"][:-4]+"_samples_recolored.ply"
+            pe.save_points_and_planes_from_array([plane_file, pt_file], data)
+
+

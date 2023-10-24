@@ -2,19 +2,17 @@ import os, sys, subprocess, pathlib
 sys.path.append(os.path.join(os.path.dirname(__file__)))
 from scan_settings import scan_settings
 import numpy as np
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from tqdm import tqdm
 import trimesh
 import open3d as o3d
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from libmesh import check_mesh_contains
 from pathlib import Path
-from default_dataset import DATASET
+from .default_dataset import DefaultDataset
 
 
 
 DEBUG = 1
-class Berger(DATASET):
+class Berger(DefaultDataset):
 
     def __init__(self,classes=[]):
         super().__init__()
@@ -30,7 +28,7 @@ class Berger(DATASET):
                 categories.remove('')
             self.classes = categories
 
-    def getModels(self,scan_conf=["0","1","2","3","4"],hint=None):
+    def get_models(self,scan_conf=["0","1","2","3","4"],hint=None):
 
 
         self.scan_conf = scan_conf if isinstance(scan_conf, list) else [scan_conf]
@@ -79,7 +77,7 @@ class Berger(DATASET):
                 d["ksr"]["partition"] = os.path.join(self.path,"ksr",'{}','{}',c,s,"partition.ply")
 
                 d["abspy"] = {}
-                d["abspy"]["surface"] = os.path.join(self.path,"abspy",'{}','{}',c,s,"surface.off")
+                d["abspy"]["surface"] = os.path.join(self.path,"abspy",'{}','{}',c,s,"surface.obj")
                 d["abspy"]["partition"] = os.path.join(self.path,"abspy",'{}','{}',c,s,"partition.ply")
 
                 d["coacd"] = {}
@@ -100,7 +98,7 @@ class Berger(DATASET):
              normal_method='jet', normal_neighborhood=30, normal_orient=1):
 
         if(len(self.model_dicts) < 1):
-            print("\nERROR: run getModels() first!")
+            print("\nERROR: run get_models() first!")
             sys.exit(1)
 
         scan = scan_settings[scan_setting]
@@ -233,7 +231,7 @@ class Berger(DATASET):
 
     def estimNormals(self, method='jet', neighborhood=30, orient=1):
         if (len(self.model_dicts) < 1):
-            print("\nERROR: run getModels() first!")
+            print("\nERROR: run get_models() first!")
             sys.exit(1)
 
         for m in tqdm(self.model_dicts, ncols=50):
@@ -301,7 +299,7 @@ class Berger(DATASET):
 
 
         if(len(self.model_dicts) < 1):
-            print("\nERROR: run getModels() first!")
+            print("\nERROR: run get_models() first!")
             sys.exit(1)
 
 
@@ -377,6 +375,6 @@ if __name__ == '__main__':
     # model = "double_slanted_cube"
     models = ["cube","split_cube","double_split_cube","slanted_cube","double_slanted_cube","complex_cube"]
     ds = Berger(classes=models)
-    ds.getModels(scan_conf="1")
+    ds.get_models(scan_conf="1")
     # ds.standardize()
     ds.makeEval(n_points=100000,padding=0.1)

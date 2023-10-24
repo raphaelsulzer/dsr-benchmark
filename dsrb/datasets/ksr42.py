@@ -1,19 +1,12 @@
-import os, sys, subprocess, pathlib
-import shutil
-
-sys.path.append(os.path.join(os.path.dirname(__file__)))
+import os, sys, subprocess, trimesh
 from scan_settings import scan_settings
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from libmesh import check_mesh_contains
 from tqdm import tqdm
 import numpy as np
 from glob import glob
-import trimesh
-# import open3d as o3d
-from glob import glob
 from pathlib import Path
 from default_dataset import DefaultDataset
-
+import open3d as o3d
 
 DEBUG = 1
 

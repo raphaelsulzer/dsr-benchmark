@@ -358,7 +358,9 @@ class MeshEvaluator:
         return out_dict
 
 
-    def eval(self, models, inpath="", outpath="", scale=True, transform=False, method=None, export=False):
+    def eval(self, models, method=None, outpath="",
+             scale=True, transform=False,
+             group_by_class=True, export=False):
 
         self.eval_dicts=[]
 
@@ -368,6 +370,10 @@ class MeshEvaluator:
 
         for model in tqdm(models):
             try:
+
+                if not os.path.isfile(model[method["name"]]["surface"]):
+                    self.logger.warning("{} is not a file.".format(model[method["name"]]["surface"]))
+                    continue
                 mesh = trimesh.load(model[method["name"]]["surface"], process=False)
 
                 if(transform):
@@ -415,7 +421,7 @@ class MeshEvaluator:
                 md["surf_regions"] = np.nan
                 md["in_cells"] = np.nan
 
-                # self.get_surface_complexity(model,md,method)
+                self.get_surface_complexity(model,md,method)
 
                 self.eval_dicts.append(md)
 
@@ -436,12 +442,15 @@ class MeshEvaluator:
 
 
             except Exception as e:
-                raise e
+                # raise e
                 self.logger.error("{}".format(e))
                 self.logger.error("Skipping {}/{}".format(model["class"], model["model"]))
 
                 # return None
 
+        if not len(self.eval_dicts):
+            self.logger.error("No models to evaluate found!")
+            return None
 
         eval_df_full = pd.DataFrame(self.eval_dicts)
 
@@ -454,10 +463,14 @@ class MeshEvaluator:
         op = os.path.join(outpath, "surface_full_{}{}{}.csv".format(method["name"],method["k"],pp))
         os.makedirs(os.path.join(outpath),exist_ok=True)
         eval_df_full.to_csv(op,float_format='%.3g')
-        eval_df_class = eval_df_full.groupby(by=['class']).mean(numeric_only=True)
-        eval_df_class.loc['mean'] = eval_df_full.mean(numeric_only=True)
 
-        return eval_df_full, eval_df_class
+        if group_by_class:
+            eval_df_class = eval_df_full.groupby(by=['class']).mean(numeric_only=True)
+            eval_df_class.loc['mean'] = eval_df_full.mean(numeric_only=True)
+            return eval_df_full, eval_df_class
+        else:
+            eval_df_full.loc['mean'] = eval_df_full.mean(numeric_only=True)
+            return eval_df_full
 
 
 
