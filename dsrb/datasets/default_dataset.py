@@ -1,4 +1,4 @@
-import os, sys, subprocess, pathlib, shutil, trimesh
+import os, sys, subprocess, pathlib, shutil, trimesh, vedo
 from libmesh import check_mesh_contains
 from tqdm import tqdm
 import numpy as np
@@ -27,8 +27,6 @@ class DefaultDataset:
         self.debug_export = debug_export
 
         self.tqdm_disabled = not tqdm_enabled
-
-
 
 
     def scan(self,scan_setting="4",scanner_dir="/home/raphael/cpp/mesh-tools/build/release/scan",
@@ -305,21 +303,57 @@ class DefaultDataset:
                 print(e)
                 print("Problem with {}".format(m["model"]))
 
-    def recolor_mesh(self):
 
-        for model in tqdm(self.models, disable=self.tqdm_disabled):
+    def color_mesh_by_component_trimesh(self, mesh, colors):
 
-            in_mesh_file = os.path.join(out_path, model["class"], model["model"], "in_cells.ply")
+        meshes = []
 
-            if not os.path.isfile(in_mesh_file):
-                print("{} does not exist".format(in_mesh_file))
+        for me in mesh.split():
+            # me.visual.face_colors = np.random.randint(100,255,size=3).tolist()
+            col = colors[np.random.choice(len(colors))]
+            col = mcolors.to_rgb(col)
+            col = (np.array(col) * 255).astype(int)
+            # me.visual.face_colors = col
+            me.visual.vertex_colors = col
+            meshes.append(me)
+
+        return trimesh.util.concatenate(meshes), len(meshes)
+
+    def color_mesh_by_component_vedo(self, mesh, colors):
+
+        meshes = []
+        ms = mesh.split()
+        for me in ms:
+            # me.visual.face_colors = np.random.randint(100,255,size=3).tolist()
+            col = colors[np.random.choice(len(colors))]
+            col = mcolors.to_rgb(col)
+            col = (np.array(col) * 255).astype(int)
+            # me.visual.face_colors = col
+            me.pointcolors = col
+            meshes.append(me)
+
+        return vedo.merge(meshes), len(meshes)
+
+    def recolor_in_cells(self,method,colors=["#fd7f6f", "#7eb0d5", "#b2e061", "#bd7ebe", "#ffb55a", "#ffee65", "#beb9db", "#fdcce5", "#8bd3c7"],backend="vedo"):
+
+        for model in tqdm(self.model_dicts, disable=self.tqdm_disabled):
+
+            infile = model[method]["in_cells"]
+
+            if not os.path.isfile(infile):
+                print("{} does not exist".format(infile))
                 continue
 
-            out_mesh_file = os.path.join(out_path, model["class"], model["model"], "in_cells_recolored.ply")
+            outfile = infile[:-4]+"_recolored"+infile[-4:]
 
-            mesh = vedo.load(in_mesh_file)
-            mesh, n = self.color_mesh_by_component(mesh)
-            vedo.io.write(mesh, out_mesh_file, binary=False)
+            if backend == "vedo":
+                mesh = vedo.load(infile)
+                mesh, n = self.color_mesh_by_component_vedo(mesh,colors)
+                vedo.io.write(mesh, outfile, binary=False)
+            else:
+                mesh = trimesh.load(infile)
+                mesh, n = self.color_mesh_by_component_trimesh(mesh,colors)
+                mesh.export(outfile)
 
     def recolor_planes(self, colors = None):
 

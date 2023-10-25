@@ -13,6 +13,7 @@ from glob import glob
 from default_dataset import DefaultDataset
 from copy import deepcopy
 from collections import defaultdict
+# from fancycolor import Recolor
 
 DEBUG = 1
 class ScalabilityDataset(DefaultDataset):
@@ -30,7 +31,7 @@ class ScalabilityDataset(DefaultDataset):
                 models.remove('')
             self.models = models
 
-    def get_models(self,scales=["40","100","250","500","2k","10k"],names=None):
+    def get_models(self,scales=["40","70","100","250","500","2k","5k","10k"],names=None):
 
         if not isinstance(names,list) and names is not None:
             names = [names]
@@ -48,14 +49,6 @@ class ScalabilityDataset(DefaultDataset):
 
                 d = {}
                 d["model"] = m
-                # if s in ["40","100","250","500","1000"]:
-                #     d["n_sample_points"] = 150000
-                # elif s in ["2k"]:
-                #     d["n_sample_points"] = 250000
-                # elif s in ["10k","50k"]:
-                #     d["n_sample_points"] = 1000000
-                # else:
-                #     raise NotImplementedError
 
                 d["scale"] = s
                 d["class"] = s
@@ -79,12 +72,6 @@ class ScalabilityDataset(DefaultDataset):
                 d["planes_ply"] = os.path.join(self.path,"planes",s,m+".ply")
                 d["plane_params"] = os.path.join(self.path,"planes",s,m+".json")
 
-
-                # d["plane_params"] = os.path.join(self.path,"planes",s,m,"params.txt")
-                # d["ransac"] = os.path.join(self.path,"ransac",s,m,"planes.npz")
-
-                # d["partition"] = os.path.join(self.path,'{}','{}',c,s,"partition.ply")
-                # d["compact_surface"] = os.path.join(self.path,'{}','{}',c,s,"surface.off")
                 d["ksr"] = {}
                 d["ksr"]["surface"] = os.path.join(self.path,"ksr",'{}','{}',s,m,"surface.off")
                 d["ksr"]["partition"] = os.path.join(self.path,"ksr",'{}','{}',s,m,"partition.ply")
@@ -96,6 +83,12 @@ class ScalabilityDataset(DefaultDataset):
                 d["coacd"] = {}
                 d["coacd"]["partition"] = os.path.join(self.path,"coacd",s,m,"in_cells.ply")
                 d["coacd"]["surface"] = os.path.join(self.path,"coacd",s,m,"in_cells.ply")
+                d["coacd"]["in_cells"] = os.path.join(self.path,"coacd",s,m,"in_cells.ply")
+
+                d["compod"] = {}
+                d["compod"]["partition"] = os.path.join(self.path,"output","partition","{}_{}.ply".format(m,s))
+                d["compod"]["surface"] = os.path.join(self.path,"output","surface","{}_{}.ply".format(m,s))
+                d["compod"]["in_cells"] = os.path.join(self.path,"output","in_cells","{}_{}.ply".format(m,s))
 
                 d["qem"] = {}
                 d["qem"]["partition"] = os.path.join(self.path,"qem",'{}',s,m,"in_cells.ply")
@@ -222,9 +215,7 @@ class ScalabilityDataset(DefaultDataset):
             command.append("registration_error")
             command.append(config.get("uniform", "registration_error"))
 
-        # if config.has_option("uniform", "normal_type"):
-        #         command.append("normal_type")
-        #         command.append(config.get("uniform", "normal_type"))
+
         command.append("normal_type")
         command.append(str(args.normal_type))
 
@@ -238,16 +229,6 @@ class ScalabilityDataset(DefaultDataset):
 
         print(*command)
         subprocess.check_call(command)
-
-        # ### usage:
-        # args = Munch()
-        # args.working_dir = "/home/adminlocal/PhD/data/benchmark/scan_example"
-        # args.program_dir = "/home/adminlocal/PhD/cpp/reconbench-CMake/build/release"
-        # # args.working_dir = "/mnt/raphael/scan_example"
-        # # args.program_dir = "/home/raphael/cpp/reconbench-CMake/build/release"
-        # args.conf = "5"
-        # args.normal_type = 4
-        # scanShape(args)
 
 
 
@@ -301,11 +282,11 @@ class ScalabilityDataset(DefaultDataset):
 
             a = 5
 
-    def make_poisson(self, depth=8, boundary=2):
+    def make_poisson(self, depth=10, boundary=2):
 
         for m in tqdm(self.model_dicts, ncols=50):
             # try:
-            command = [self.POISSON_EXE,
+            command = [self.poisson_exe,
                        "--in", m["pointcloud_ply"],
                        "--out", m["mesh"],
                        "--depth", str(depth),
@@ -435,7 +416,7 @@ class ScalabilityDataset(DefaultDataset):
             psd.load_points(np.asarray(pcd.points), np.asarray(pcd.normals))
             psd.detect(**par)
             # psd.set_discretization()
-            psd.refine(max_seconds=7200)
+            psd.refine(max_seconds=180)
             psd.save(model["planes"])
             psd.save(model["planes_ply"])
 
@@ -458,18 +439,12 @@ class ScalabilityDataset(DefaultDataset):
         print(df)
 
 
-
-if __name__ == '__main__':
+def make_coacd_comparison_dataset():
 
     ds = ScalabilityDataset()
-    # ds.get_models(scales='250',names=["temple"])
-    ds.get_models(scales='20k',names=["chicago"])
+    ds.get_models(scales=["250"],names=["castle"])
+    # ds.get_models(scales=["70"],names=["runninghorse"])
     # ds.get_models()
-
-
-    # ds.make_eval(n_points=100000)
-    # ds.sample(n_points=2000000)
-
 
     # 40
     # params = {"min_inliers": 4000, "epsilon": 0.02, "normal_th": 0.5}
@@ -480,9 +455,30 @@ if __name__ == '__main__':
     # sazabi
     # params = {"min_inliers": 6500, "epsilon": 0.07, "normal_th": 0.49}
     # temple
-    params = {"min_inliers": 8000, "epsilon": 0.085, "normal_th": 0.48}
+    # params = {"min_inliers": 8000, "epsilon": 0.085, "normal_th": 0.48}
     # city
     # params = {"min_inliers": 10000, "epsilon": 0.9, "normal_th": 0.5}
+    # castle
+    params = {"min_inliers": 2000, "epsilon": 0.05, "normal_th": 0.6}
+
+    # 70
+    # params = {"min_inliers": 2200, "epsilon": 0.016, "normal_th": 0.62}
+    # # "tarbosaurus",
+    # params = {"min_inliers": 2800, "epsilon": 0.018, "normal_th": 0.6}
+    # # "forbiddentower"
+    # params = {"min_inliers": 3200, "epsilon": 0.025, "normal_th": 0.59}
+    # # "droid"
+    # params = {"min_inliers": 5000, "epsilon": 0.06, "normal_th": 0.57}
+    # # "temple"
+    # params = {"min_inliers": 5000, "epsilon": 0.06, "normal_th": 0.55}
+    # # "sazabi"
+    # # params = {"min_inliers": 4500, "epsilon": 0.065, "normal_th": 0.6}
+    # # runninghorse
+    # params = {"min_inliers": 2000, "epsilon": 0.014, "normal_th": 0.65}
+    # castle
+    # params = {"min_inliers": 900, "epsilon": 0.03, "normal_th": 0.55}
+
+
 
     # 100
     # params = {"min_inliers": 1000, "epsilon": 0.015, "normal_th": 0.6}
@@ -495,7 +491,7 @@ if __name__ == '__main__':
     # sazabi
     # params = {"min_inliers": 3000, "epsilon": 0.045, "normal_th": 0.55}
     # temple
-    # params = {"min_inliers": 4000, "epsilon": 0.055, "normal_th": 0.55}
+    params = {"min_inliers": 400, "epsilon": 0.025, "normal_th": 0.55}
 
     # 250
     # params = {"min_inliers": 300, "epsilon": 0.01, "normal_th": 0.75}
@@ -508,7 +504,10 @@ if __name__ == '__main__':
     # sazabi
     # params = {"min_inliers": 1200, "epsilon": 0.022, "normal_th": 0.6}
     # temple
-    params = {"min_inliers": 1400, "epsilon": 0.022, "normal_th": 0.65}
+    # params = {"min_inliers": 1400, "epsilon": 0.022, "normal_th": 0.65}
+    # castle
+    params = {"min_inliers": 120, "epsilon": 0.02, "normal_th": 0.58}
+
 
     # # 500
     # params = {"min_inliers": 100, "epsilon": 0.008, "normal_th": 0.80}
@@ -522,6 +521,9 @@ if __name__ == '__main__':
     # params = {"min_inliers": 600, "epsilon": 0.012, "normal_th": 0.70}
     # temple
     # params = {"min_inliers": 900, "epsilon": 0.016, "normal_th": 0.7}
+    # castle
+    # params = {"min_inliers": 30, "epsilon": 0.008, "normal_th": 0.75}
+
 
     # # # 2000
     # params = {"min_inliers": 30, "epsilon": 0.004, "normal_th": 0.90}
@@ -535,6 +537,19 @@ if __name__ == '__main__':
     # params = {"min_inliers": 120, "epsilon": 0.006, "normal_th": 0.85}
     # temple
     # params = {"min_inliers": 180, "epsilon": 0.0075, "normal_th": 0.8}
+    # castle
+    # params = {"min_inliers": 7, "epsilon": 0.001, "normal_th": 0.9}
+
+
+    # 5000
+    # params = {"min_inliers": 30, "epsilon": 0.0025, "normal_th": 0.85}
+    # forbidden tower
+    # params = {"min_inliers": 50, "epsilon": 0.0035, "normal_th": 0.90}
+    # temple
+    # params = {"min_inliers": 35, "epsilon": 0.0028, "normal_th": 0.90}
+    # castle
+    # params = {"min_inliers": 3, "epsilon": 0.0008, "normal_th": 0.95}
+
 
     # # # 10000
     # params = {"min_inliers": 8, "epsilon": 0.001, "normal_th": 0.96}
@@ -551,12 +566,21 @@ if __name__ == '__main__':
     # city
     # params = {"min_inliers": 12, "epsilon": 0.0018, "normal_th": 0.92}
 
-
     # 20k
     # city
-    params = {"min_inliers": 10, "epsilon": 0.0005, "normal_th": 0.95}
-
+    # params = {"min_inliers": 10, "epsilon": 0.0005, "normal_th": 0.95}
 
     ds.detect_planes(params)
-
     ds.plot_plane_params()
+
+
+
+if __name__ == '__main__':
+
+
+    # ds = ScalabilityDataset()
+    # ds.get_models(scales="40",names='castle')
+    #
+    # ds.sample(2000000)
+
+    make_coacd_comparison_dataset()
