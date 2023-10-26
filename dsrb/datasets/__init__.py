@@ -2,6 +2,7 @@ from .default_dataset import DefaultDataset
 from .shapenet import ShapeNet
 from .modelnet10 import ModelNet10
 from .ksr42 import KSR42
+from .ksr42_original import KSR42Dataset_ori
 from .simpleShapes import SimpleShapes
 from .scalability import ScalabilityDataset
 from .berger import Berger

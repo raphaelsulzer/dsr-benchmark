@@ -1,4 +1,6 @@
 import os, sys, subprocess
+import shutil
+
 sys.path.append(os.path.join(os.path.dirname(__file__)))
 from scan_settings import scan_settings
 from tqdm import tqdm
@@ -192,7 +194,16 @@ class ShapeNet:
 if __name__ == '__main__':
 
     ds = ShapeNet()
-    ds.setup()
+    ds.get_models()
+    # ds.setup()
     # ds.get_models(reduce=0.01)
     # ds.standardize()
     # ds.sample(n_points=100000)
+
+    for split in ds.model_dicts:
+
+        for model in ds.model_dicts[split]:
+
+            os.remove(os.path.join(model["path"],"model.binvox"))
+
+            a=5

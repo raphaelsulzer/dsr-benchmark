@@ -1,39 +1,181 @@
-import os, sys, subprocess, pathlib, shutil, trimesh, vedo
+import os, sys, subprocess, trimesh, shutil
+from scan_settings import scan_settings
 from libmesh import check_mesh_contains
 from tqdm import tqdm
 import numpy as np
 from glob import glob
-import open3d as o3d
-from glob import glob
-from converter import Converter
 from pathlib import Path
-import matplotlib.colors as mcolors
+from default_dataset import DefaultDataset
+import open3d as o3d
+from pypsdr import psdr
+
+DEBUG = 1
 
 
-class DefaultDataset:
 
-    def __init__(self,path="/home/rsulzer/data",
-                 mesh_tools_dir="/home/rsulzer/cpp/mesh-tools/build/release",
-                 poisson_exe = "/home/rsulzer/cpp/PoissonRecon/Bin/Linux/PoissonRecon",
-                 tqdm_enabled=True,
-                 debug_export=False):
+class KSR42Dataset_ori(DefaultDataset):
 
-        self.path = path
+    def __init__(self,classes=[]):
+        super().__init__()
+        self.path = os.path.join(self.path, "KSR42_original")
 
-        self.model_dicts = []
-        self.mesh_tools_dir = mesh_tools_dir
-        self.poisson_exe = poisson_exe
+        self.classes = classes if isinstance(classes,list) else [classes]
 
-        self.debug_export = debug_export
+        if not classes:
+            with open(os.path.join(self.path, "classes.lst"), 'r') as f:
+                categories = f.read().split('\n')
+            if '' in categories:
+                categories.remove('')
+            self.classes = categories
 
-        self.tqdm_disabled = not tqdm_enabled
+
+    def setup(self):
+
+        ## make model.lst
+        # for c in self.classes:
+        #
+        #     cpath = os.path.join(self.path,c)
+        #     models = os.listdir(cpath)
+        #     np.savetxt(os.path.join(cpath,'models.lst'), models, fmt="%s")
+
+        # ## rename input point cloud
+        # for model in self.model_dicts:
+        #
+        #     files = glob(model["path"]+"/*.vg")
+        #
+        #     if not len(files) == 1:
+        #         print(model["path"])
+        #         continue
+        #     else:
+        #         # pcd=o3d.io.read_point_cloud(files[0])
+        #         #
+        #         # os.makedirs(os.path.join(model["path"],"pointcloud"))
+        #         #
+        #         # if not pcd.has_normals():
+        #         #     o3d.geometry.estimate_normals(pcd)
+        #         #
+        #         # o3d.io.write_point_cloud(os.path.join(model["path"],"pointcloud","pointcloud.ply"),pcd)
+        #         #
+        #         # points = np.asarray(pcd.points)
+        #         # normals = np.asarray(pcd.normals)
+        #         #
+        #         # np.savez(os.path.join(model["path"],"pointcloud","pointcloud.npz"),points=points,normals=normals)
+        #
+        #         os.makedirs(os.path.join(model["path"],"planes"))
+        #         shutil.copyfile(files[0], os.path.join(os.path.join(model["path"],"planes","planes.vg")))
+
+        ## setup plane param file
+        for model in self.model_dicts:
+
+
+            path = os.path.join("/root/Downloads/Kinetic-Partition-3D-Benchmark/",model["class"],model["model"])
+            files = glob(model["path"]+"/*.vg")
+
+            if not len(files) == 1:
+                print(model["path"])
+                continue
+            else:
+                # pcd=o3d.io.read_point_cloud(files[0])
+                #
+                # os.makedirs(os.path.join(model["path"],"pointcloud"))
+                #
+                # if not pcd.has_normals():
+                #     o3d.geometry.estimate_normals(pcd)
+                #
+                # o3d.io.write_point_cloud(os.path.join(model["path"],"pointcloud","pointcloud.ply"),pcd)
+                #
+                # points = np.asarray(pcd.points)
+                # normals = np.asarray(pcd.normals)
+                #
+                # np.savez(os.path.join(model["path"],"pointcloud","pointcloud.npz"),points=points,normals=normals)
+
+                os.makedirs(os.path.join(model["path"],"planes"))
+                shutil.copyfile(files[0], os.path.join(os.path.join(model["path"],"planes","planes.vg")))
+
+    def refine_planes(self):
+
+        for model in tqdm(self.model_dicts):
+
+            try:
+
+                pd = psdr(1)
+
+                pd.load_points(model["planes_vg"])
+
+                pd.detect(min_inliers=10,epsilon=0.001)
+                pd.save(model["planes"])
+                pd.save(model["planes_ply"])
+
+                # pd.refine()
+                #
+                # pd.save(model["planes"])
+
+            except:
+                print("Problem with plane extraction for model {}/{}".format(model["class"],model["model"]))
+
+
+
+
+    def get_models(self,list="models.lst",hint=None):
+
+        for c in self.classes:
+
+            models = np.genfromtxt(os.path.join(self.path,c,list),dtype=str)
+
+            for m in models:
+
+                if m[0] == "#":
+                    continue
+
+                if hint is not None:
+                    if hint not in m:
+                        continue
+
+                d = {}
+                d["class"] = c
+                d["model"] = m
+                d["path"] = os.path.join(self.path,c,m)
+
+                d["pointcloud"] = os.path.join(self.path,c,m,"pointcloud","pointcloud.npz")
+                d["pointcloud_ply"] = os.path.join(self.path,c,m,"pointcloud","pointcloud.ply")
+
+                d["eval"] = dict()
+                d["eval"]["occ"] = None
+                d["eval"]["pointcloud"] = os.path.join(self.path,c,m,"pointcloud","pointcloud.npz")
+
+                d["mesh"] = None
+
+                d["planes_vg"] = os.path.join(self.path,c,m,"planes","planes.vg")
+                d["planes_ply"] = os.path.join(self.path,c,m,"planes","planes.ply")
+                d["planes"] = os.path.join(self.path,c,m,"planes","planes.npz")
+
+                d["ksr"] = {}
+                d["ksr"]["surface"] = os.path.join(self.path,c,m,"ksr",'{}','{}',"surface.off")
+                d["ksr"]["partition"] = os.path.join(self.path,c,m,"ksr",'{}','{}',"partition.ply")
+
+                d["abspy"] = {}
+                d["abspy"]["surface"] = os.path.join(self.path,c,m,"abspy",'{}','{}',"surface.off")
+                d["abspy"]["partition"] = os.path.join(self.path,c,m,"abspy",'{}','{}',"partition.ply")
+
+                d["coacd"] = {}
+                d["coacd"]["surface"] = os.path.join(self.path,c,m,"coacd","in_cells.ply")
+                d["coacd"]["partition"] = os.path.join(self.path,c,m,"coacd","in_cells.ply")
+
+                d["qem"] = {}
+                d["qem"]["surface"] = os.path.join(self.path,c,m,"qem",'{}',"surface.off")
+                d["qem"]["partition"] = os.path.join(self.path,c,m,"qem",'{}',"in_cells.ply")
+
+                self.model_dicts.append(d)
+
+        return self.model_dicts
+
 
 
     def scan(self,scan_setting="4",scanner_dir="/home/raphael/cpp/mesh-tools/build/release/scan",
              normal_method='jet', normal_neighborhood=30, normal_orient=1):
 
         if(len(self.model_dicts) < 1):
-            print("\nERROR: run getModels() first!")
+            print("\nERROR: run get_models() first!")
             sys.exit(1)
 
         scan = scan_settings[scan_setting]
@@ -60,52 +202,12 @@ class DefaultDataset:
             p.wait()
 
 
-    def sample(self,n_points=1000000):
-
-        for m in tqdm(self.model_dicts, disable=self.tqdm_disabled):
-
-            try:
-                os.makedirs(os.path.dirname(m["pointcloud"]), exist_ok=True)
-                mesh = trimesh.load(m["mesh"])
-                points, fid = mesh.sample(n_points, return_index=True)
-                normals = mesh.face_normals[fid]
-
-                # print('Writing points to: {}'.format(m["pointcloud"]))
-                pcd = o3d.geometry.PointCloud()
-                pcd.points = o3d.utility.Vector3dVector(points)
-                pcd.normals = o3d.utility.Vector3dVector(normals)
-                o3d.io.write_point_cloud(m["pointcloud_ply"], pcd)
-
-                np.savez(m["pointcloud"],points=points,normals=normals)
-
-            except Exception as e:
-                print(e)
-                print("Problem with {}".format(m["model"]))
-
-
-
-    def make_pointcloud_ply(self,n_points=100000,std_noise=0.0):
-        print("Writing pointclouds for reconstruction input...\n")
-
-        for m in tqdm(self.model_dicts):
-
-            data = np.load(m["pointcloud"])
-
-            ind = np.random.randint(0, data["points"].shape[0], size = (n_points,))
-
-            pcd = o3d.geometry.PointCloud()
-            pcd.points = o3d.utility.Vector3dVector(data["points"][ind])
-            pcd.normals = o3d.utility.Vector3dVector(data["normals"][ind])
-            o3d.io.write_point_cloud(m["pointcloud_ply"], pcd)
-
-
-
-    def estim_normals(self, method='jet', neighborhood=30, orient=1):
+    def estimate_normals(self, method='jet', neighborhood=30, orient=1):
         if (len(self.model_dicts) < 1):
-            print("\nERROR: run getModels() first!")
+            print("\nERROR: run get_models() first!")
             sys.exit(1)
 
-        for m in tqdm(self.model_dicts, disable=self.tqdm_disabled):
+        for m in tqdm(self.model_dicts, ncols=50):
             try:
                 command = [str(os.path.join(self.mesh_tools_dir, "normal")),
                            "-w", str(self.path),
@@ -124,14 +226,20 @@ class DefaultDataset:
                 print("Skipping {}/{}".format(m["class"], m["model"]))
 
     def clean(self):
+
         for m in tqdm(self.model_dicts, ncols=50):
+
+
             try:
+
                 os.remove(str(Path(m["mesh"]).with_suffix(".ply")))
             except:
                 print(m["model"])
                 # raise
 
     def make_poisson(self, depth=8, boundary=2):
+
+
         for m in tqdm(self.model_dicts, ncols=50):
             # try:
             command = [self.POISSON_EXE,
@@ -146,11 +254,8 @@ class DefaultDataset:
 
 
     def standardize(self,padding=0.1):
-        """
-        Standardize mesh so that maximum bounding box side length is 1.
-        :return:
-        """
-        for m in tqdm(self.model_dicts,disable=self.tqdm_disabled):
+
+        for m in tqdm(self.model_dicts):
 
             if os.path.isfile(os.path.splitext(m["mesh"])[0]+"_unit.off"):
                continue
@@ -173,29 +278,21 @@ class DefaultDataset:
             o3d.io.write_triangle_mesh(os.path.splitext(m["mesh"])[0]+"_unit.off",mesh)
 
 
-    def scale(self):
-        """
-        Scale mesh so that bounding box has a diagonal length of 1.
-        :return:
-        """
 
-        for m in tqdm(self.model_dicts,disable=self.tqdm_disabled):
+    def make_pointcloud_ply(self,n_points=100000,std_noise=0.0):
 
-            mesh = o3d.io.read_triangle_mesh(m["mesh"])
+        print("Writing pointclouds for reconstruction input...\n")
 
-            bb = mesh.get_axis_aligned_bounding_box()
-            mesh = mesh.translate(-bb.get_center(),relative=True)
+        for m in tqdm(self.model_dicts):
 
-            minb = mesh.get_min_bound()
-            maxb = mesh.get_max_bound()
-            diag = np.linalg.norm(minb-maxb)
+            data = np.load(m["pointcloud"])
 
-            mesh = mesh.scale(1/diag,center=(0,0,0))
+            ind = np.random.randint(0, data["points"].shape[0], size = (n_points,))
 
-            outfile = os.path.join(self.path,"input_unit",os.path.split(m["mesh"])[1])
-            os.makedirs(os.path.dirname(outfile),exist_ok=True)
-            o3d.io.write_triangle_mesh(outfile,mesh)
-
+            pcd = o3d.geometry.PointCloud()
+            pcd.points = o3d.utility.Vector3dVector(data["points"][ind])
+            pcd.normals = o3d.utility.Vector3dVector(data["normals"][ind])
+            o3d.io.write_point_cloud(m["pointcloud_ply"], pcd)
 
 
     def convert(self):
@@ -225,11 +322,20 @@ class DefaultDataset:
 
 
 
+
     def make_eval(self,n_points=100000,unit=False,surface=True,occ=True):
+
         print("Sample points on surface and in bounding box for evaluation...\n")
+
+
         if(len(self.model_dicts) < 1):
-            print("\nERROR: run getModels() first!")
+            print("\nERROR: run get_models() first!")
             sys.exit(1)
+
+
+
+
+
         for m in tqdm(self.model_dicts):
 
             try:
@@ -249,7 +355,7 @@ class DefaultDataset:
 
                     np.savez(m["eval"]["pointcloud"], points=points_surface, normals=normals)
 
-                    if self.debug_export:
+                    if DEBUG:
                         print('Writing points: %s' % m["eval"]["pointcloud"])
                         pcd = o3d.geometry.PointCloud()
                         pcd.points = o3d.utility.Vector3dVector(points_surface)
@@ -269,14 +375,16 @@ class DefaultDataset:
                         min=o3dmesh.get_min_bound()
                         max=o3dmesh.get_max_bound()
                         points_uniform = np.random.uniform(low=min,high=max,size=(n_points_uniform,3))
-                        points_surface = mesh.sample(n_points_surface)
-                        points_surface += 0.05 * np.random.randn(n_points_surface, 3) * np.linalg.norm(min-max)
+                        bb_diag = np.linalg.norm(min-max)
                     else:
                         points_uniform = np.random.rand(n_points_uniform, 3)
                         points_uniform = points_uniform - 0.5
-                        points_surface = mesh.sample(n_points_surface)
-                        points_surface += 0.05 * np.random.randn(n_points_surface, 3)
+                        bb_diag = sqrt(3)
 
+
+
+                    points_surface = mesh.sample(n_points_surface)
+                    points_surface += 0.05 * bb_diag * np.random.randn(n_points_surface, 3)
                     points = np.concatenate([points_uniform, points_surface], axis=0)
 
                     occupancies = check_mesh_contains(mesh, points)
@@ -292,99 +400,22 @@ class DefaultDataset:
 
                     np.savez(m["eval"]["occ"], points=points, occupancies=occupancies)
 
-                    if self.debug_export:
+                    if DEBUG:
                         print('Writing points: %s' % m["eval"]["occ"])
                         pcd = o3d.geometry.PointCloud()
                         pcd.points = o3d.utility.Vector3dVector(points)
                         pcd.colors = o3d.utility.Vector3dVector(colors)
                         o3d.io.write_point_cloud(str(Path(m["eval"]["occ"]).with_suffix(".ply")), pcd)
 
+
             except Exception as e:
                 print(e)
                 print("Problem with {}".format(m["model"]))
 
 
-    def color_mesh_by_component_trimesh(self, mesh, colors):
 
-        meshes = []
+if __name__ == '__main__':
 
-        for me in mesh.split():
-            # me.visual.face_colors = np.random.randint(100,255,size=3).tolist()
-            col = colors[np.random.choice(len(colors))]
-            col = mcolors.to_rgb(col)
-            col = (np.array(col) * 255).astype(int)
-            # me.visual.face_colors = col
-            me.visual.vertex_colors = col
-            meshes.append(me)
-
-        return trimesh.util.concatenate(meshes), len(meshes)
-
-    def color_mesh_by_component_vedo(self, mesh, colors):
-
-        meshes = []
-        ms = mesh.split()
-        for me in ms:
-            # me.visual.face_colors = np.random.randint(100,255,size=3).tolist()
-            col = colors[np.random.choice(len(colors))]
-            col = mcolors.to_rgb(col)
-            col = (np.array(col) * 255).astype(int)
-            # me.visual.face_colors = col
-            me.pointcolors = col
-            meshes.append(me)
-
-        return vedo.merge(meshes), len(meshes)
-
-    def recolor_in_cells(self,method,colors = ["#CC99C9","#9EC1CF","#9EE09E","#FDFD97","#FEB144","#FF6663"],backend="vedo"):
-
-        for model in tqdm(self.model_dicts, disable=self.tqdm_disabled):
-
-            infile = model[method]["in_cells"]
-
-            if not os.path.isfile(infile):
-                print("{} does not exist".format(infile))
-                continue
-
-            outfile = infile[:-4]+"_recolored"+infile[-4:]
-
-            if backend == "vedo":
-                mesh = vedo.load(infile)
-                mesh, n = self.color_mesh_by_component_vedo(mesh,colors)
-                vedo.io.write(mesh, outfile, binary=False)
-            else:
-                mesh = trimesh.load(infile)
-                mesh, n = self.color_mesh_by_component_trimesh(mesh,colors)
-                mesh.export(outfile)
-
-    def recolor_planes(self, colors = None):
-
-        from pycompod import PlaneExporter
-
-        # standard colors:
-        # https://coolors.co/ff0000-f4ec00-01ffff-ff7f00-0000ff-00ff01-6f00d8-ff00ff
-        if colors is None:
-            colors = ["#ff0000", "#f4ec00", "#01ffff", "#ff7f00", "#0000ff", "#00ff01", "#6f00d8", "#ff00ff"]
-
-        rgb_colors = []
-        for col in colors:
-            col = mcolors.to_rgb(col)
-            col = (np.array(col) * 255).astype(int)
-            rgb_colors.append(col)
-        rgb_colors = np.array(rgb_colors)
-
-        pe = PlaneExporter()
-        for model in tqdm(self.model_dicts):
-
-            if not os.path.isfile(model["planes"]):
-                print("{} not found".format(model["planes"]))
-                continue
-
-            data = np.load(model["planes"])
-            data = dict(data)
-            nplanes = len(data["group_parameters"])
-            colors = np.random.choice(len(rgb_colors), nplanes)
-            data["colors"] = rgb_colors[colors]
-            plane_file = model["planes"][:-4]+"_recolored.ply"
-            pt_file = model["planes"][:-4]+"_samples_recolored.ply"
-            pe.save_points_and_planes_from_array([plane_file, pt_file], data)
-
-
+    ds = KSR42_ori()
+    ds.get_models()
+    ds.refine_planes()

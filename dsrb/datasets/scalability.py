@@ -416,7 +416,7 @@ class ScalabilityDataset(DefaultDataset):
             psd.load_points(np.asarray(pcd.points), np.asarray(pcd.normals))
             psd.detect(**par)
             # psd.set_discretization()
-            psd.refine(max_seconds=180)
+            psd.refine()
             psd.save(model["planes"])
             psd.save(model["planes_ply"])
 
@@ -442,8 +442,8 @@ class ScalabilityDataset(DefaultDataset):
 def make_coacd_comparison_dataset():
 
     ds = ScalabilityDataset()
+    # ds.get_models(scales=["6k"],names=["temple"])
     ds.get_models(scales=["250"],names=["castle"])
-    # ds.get_models(scales=["70"],names=["runninghorse"])
     # ds.get_models()
 
     # 40
@@ -490,8 +490,8 @@ def make_coacd_comparison_dataset():
     # params = {"min_inliers": 2500, "epsilon": 0.04, "normal_th": 0.55}
     # sazabi
     # params = {"min_inliers": 3000, "epsilon": 0.045, "normal_th": 0.55}
-    # temple
-    params = {"min_inliers": 400, "epsilon": 0.025, "normal_th": 0.55}
+    # castle
+    # params = {"min_inliers": 140, "epsilon": 0.04, "normal_th": 0.7}
 
     # 250
     # params = {"min_inliers": 300, "epsilon": 0.01, "normal_th": 0.75}
@@ -506,7 +506,7 @@ def make_coacd_comparison_dataset():
     # temple
     # params = {"min_inliers": 1400, "epsilon": 0.022, "normal_th": 0.65}
     # castle
-    params = {"min_inliers": 120, "epsilon": 0.02, "normal_th": 0.58}
+    params = {"min_inliers": 80, "epsilon": 0.025, "normal_th": 0.8}
 
 
     # # 500
@@ -524,13 +524,15 @@ def make_coacd_comparison_dataset():
     # castle
     # params = {"min_inliers": 30, "epsilon": 0.008, "normal_th": 0.75}
 
+    # 900
+    # params = {"min_inliers": 6, "epsilon": 0.00108, "normal_th": 0.85}
 
     # # # 2000
     # params = {"min_inliers": 30, "epsilon": 0.004, "normal_th": 0.90}
     # armadillo, Horse, tarbosaurus
     # params = {"min_inliers": 25, "epsilon": 0.003, "normal_th": 0.90}
     # forbidden tower
-    # params = {"min_inliers": 150, "epsilon": 0.005, "normal_th": 0.90}
+    # params = {"min_inliers": 100, "epsilon": 0.006, "normal_th": 0.82}
     # droid
     # params = {"min_inliers": 60, "epsilon": 0.0045, "normal_th": 0.85}
     # sazabi
@@ -549,6 +551,8 @@ def make_coacd_comparison_dataset():
     # params = {"min_inliers": 35, "epsilon": 0.0028, "normal_th": 0.90}
     # castle
     # params = {"min_inliers": 3, "epsilon": 0.0008, "normal_th": 0.95}
+
+    # 6000
 
 
     # # # 10000
