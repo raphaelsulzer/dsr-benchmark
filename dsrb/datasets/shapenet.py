@@ -200,10 +200,11 @@ if __name__ == '__main__':
     # ds.standardize()
     # ds.sample(n_points=100000)
 
-    for split in ds.model_dicts:
+    for split in tqdm(ds.model_dicts):
 
         for model in ds.model_dicts[split]:
 
-            os.remove(os.path.join(model["path"],"model.binvox"))
+            if os.path.isfile(os.path.join(model["path"],"eval","points.npz")):
+                shutil.rmtree(os.path.join(model["path"],"eval"))
 
             a=5

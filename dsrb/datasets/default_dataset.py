@@ -64,6 +64,8 @@ class DefaultDataset:
 
         for m in tqdm(self.model_dicts, disable=self.tqdm_disabled):
 
+            if os.path.isfile(m["pointcloud_ply"]):
+                continue
             try:
                 os.makedirs(os.path.dirname(m["pointcloud"]), exist_ok=True)
                 mesh = trimesh.load(m["mesh"])
@@ -76,9 +78,10 @@ class DefaultDataset:
                 pcd.normals = o3d.utility.Vector3dVector(normals)
                 o3d.io.write_point_cloud(m["pointcloud_ply"], pcd)
 
-                np.savez(m["pointcloud"],points=points,normals=normals)
+                np.savez_compressed(m["pointcloud"],points=points,normals=normals)
 
             except Exception as e:
+                raise e
                 print(e)
                 print("Problem with {}".format(m["model"]))
 
@@ -228,7 +231,7 @@ class DefaultDataset:
     def make_eval(self,n_points=100000,unit=False,surface=True,occ=True):
         print("Sample points on surface and in bounding box for evaluation...\n")
         if(len(self.model_dicts) < 1):
-            print("\nERROR: run getModels() first!")
+            print("\nERROR: run get_models() first!")
             sys.exit(1)
         for m in tqdm(self.model_dicts):
 
@@ -247,7 +250,7 @@ class DefaultDataset:
                     points_surface, fid = mesh.sample(n_points,return_index=True)
                     normals = mesh.face_normals[fid]
 
-                    np.savez(m["eval"]["pointcloud"], points=points_surface, normals=normals)
+                    np.savez_compressed(m["eval"]["pointcloud"], points=points_surface, normals=normals)
 
                     if self.debug_export:
                         print('Writing points: %s' % m["eval"]["pointcloud"])
@@ -290,7 +293,7 @@ class DefaultDataset:
                     points = points.astype(dtype)
                     occupancies = np.packbits(occupancies)
 
-                    np.savez(m["eval"]["occ"], points=points, occupancies=occupancies)
+                    np.savez_compressed(m["eval"]["occ"], points=points, occupancies=occupancies)
 
                     if self.debug_export:
                         print('Writing points: %s' % m["eval"]["occ"])
@@ -300,6 +303,7 @@ class DefaultDataset:
                         o3d.io.write_point_cloud(str(Path(m["eval"]["occ"]).with_suffix(".ply")), pcd)
 
             except Exception as e:
+                # raise e
                 print(e)
                 print("Problem with {}".format(m["model"]))
 

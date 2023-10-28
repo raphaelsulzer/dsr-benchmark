@@ -1,20 +1,21 @@
-import os, sys, subprocess
-sys.path.append(os.path.join(os.path.dirname(__file__)))
-from scan_settings import scan_settings
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+import os, sys, subprocess, trimesh
 from libmesh import check_mesh_contains
 from tqdm import tqdm
 import numpy as np
 from glob import glob
-import trimesh
 import open3d as o3d
+
+import matplotlib.pyplot as plt
+plt.switch_backend('agg')  # there was some wired bug which is solved by this https://stackoverflow.com/a/67617670
+
+from pycompod import PlaneExporter
 
 DEBUG = 0
 
 
 class SimpleShapes:
 
-    def __init__(self,path="/home/rsulzer/data/simpleShapes", mesh_tools_dir="/home/rsulzer/cpp/mesh-tools/build/release"):
+    def __init__(self,path="/home/rsulzer/data/simple_shapes", mesh_tools_dir="/home/rsulzer/cpp/mesh-tools/build/release"):
 
         self.path = path
         self.model_dicts = []
@@ -22,7 +23,7 @@ class SimpleShapes:
         self.POISSON_EXE = "/home/rsulzer/cpp/PoissonRecon/Bin/Linux/PoissonRecon"
 
 
-    def getModels(self,hint=None):
+    def get_models(self,hint=None):
 
         models = np.genfromtxt(os.path.join(self.path,"models.lst"),dtype=str)
         for m in models:
@@ -34,14 +35,16 @@ class SimpleShapes:
             d = {}
             d["class"] = ""
             d["model"] = m
-            d["scan_ply"] = glob(os.path.join(self.path,d["class"],m,'*.ply'))[0]
 
-            d["occ"] = os.path.join(self.path,d["class"],m,"eval","points.npz")
-            d["pointcloud"] = os.path.join(self.path,d["class"],m,"eval","pointcloud.npz")
+            d["eval"] = dict()
+            d["eval"]["occ"] = os.path.join(self.path,d["class"],m,"eval","points.npz")
+            d["eval"]["pointcloud"] = os.path.join(self.path,d["class"],m,"eval","pointcloud.npz")
 
-            d["pointcloud_ply"] = os.path.join(self.path,d["class"],m,"pointcloud.ply")
+            d["pointcloud"] = os.path.join(self.path,d["class"],m,"pointcloud","pointcloud.npz")
+            d["pointcloud_ply"] = os.path.join(self.path,d["class"],m,"pointcloud","pointcloud.ply")
+
             d["mesh"] = os.path.join(self.path,d["class"],m,"mesh_unit.off")
-            d["planes"] = os.path.join(self.path,d["class"],m,"planes","planes.vg")
+            d["planes"] = os.path.join(self.path,d["class"],m,"planes","planes.npz")
 
             d["ksr"] = {}
             d["ksr"]["surface"] = os.path.join(self.path,d["class"],m,"ksr",'{}',"surface.off")
@@ -238,17 +241,224 @@ class SimpleShapes:
 
 
 
+    def make_planes(self,model="cube", plot=False, noise=0.02):
+
+        res = 9
+        xx, yy = np.meshgrid(np.linspace(1, res, num=res + 1, endpoint=True, dtype=float),
+                             np.linspace(1, res, num=res + 1, endpoint=True, dtype=float))
+        xxr, yyr = np.meshgrid(np.linspace(res, 1, num=res + 1, endpoint=True, dtype=float),
+                               np.linspace(res, 1, num=res + 1, endpoint=True, dtype=float))
+        zz = np.zeros(shape=(res + 1, res + 1), dtype=float)
+        zzr = np.ones(shape=(res + 1, res + 1), dtype=float) * 10.0
+
+        if model == "split_cube":
+            ppoints = np.array(
+                [[0, 0, 0], [0, 0, 0], [0, 0, 0], [10, 10, 10], [10, 10, 10], [10, 10, 10], [5, 5, 5], [5.3, 5.3, 5.3]],
+                dtype=float)
+            normals = np.array(
+                [[0, -1, 0], [-1, 0, 0], [0, 0, -1], [0, 1, 0], [1, 0, 0], [0, 0, 1], [0, 0, 1], [0, 0, 1]],
+                dtype=float)
+
+            zz5 = np.ones(shape=(res + 1, res + 1), dtype=float) * 5.0
+            zz6 = np.ones(shape=(res + 1, res + 1), dtype=float) * 5.3
+
+            sampled_points = np.array(
+                [[xx, zz, yy], [zz, yy, xx], [xx, yy, zz], [xxr, zzr, yyr], [zzr, yyr, xxr], [xxr, yyr, zzr],
+                 [xx, yy, zz5], [xx, yy, zz6]])
+
+
+        elif model == "slanted_cube":
+            ppoints = np.array(
+                [[0, 0, 0], [0, 0, 0], [0, 0, 0], [10, 10, 10], [10, 10, 10], [10, 10, 10], [5, 5, 5], [5, 5, 10]],
+                dtype=float)
+            normals = np.array(
+                [[0, -1, 0], [-1, 0, 0], [0, 0, -1], [0, 1, 0], [1, 0, 0], [0, 0, 1], [0, 0, 1], [0.5, 0, 0.45]],
+                dtype=float)
+
+            zz5 = np.ones(shape=(res + 1, res + 1), dtype=float) * 5.0
+
+            d = -ppoints[-1].dot(normals[-1])
+            zzs = (-normals[-1][0] * xx - normals[-1][1] * yy - d) * 1. / normals[-1][2]
+            sampled_points = np.array(
+                [[xx, zz, yy], [zz, yy, xx], [xx, yy, zz], [xxr, zzr, yyr], [zzr, yyr, xxr], [xxr, yyr, zzr],
+                 [xx, yy, zz5],
+                 [xx, yy, zzs]])
+
+        elif model == "double_slanted_cube":
+            ppoints = np.array(
+                [[0, 0, 0], [0, 0, 0], [0, 0, 0], [10, 10, 10], [10, 10, 10], [10, 10, 10], [5, 5, 5], [5, 5, 10],
+                 [5, 5, 10]], dtype=float)
+            normals = np.array(
+                [[0, -1, 0], [-1, 0, 0], [0, 0, -1], [0, 1, 0], [1, 0, 0], [0, 0, 1], [0, 0, 1], [0.5, 0, 0.5],
+                 [0, 0.5, 0.5]], dtype=float)
+
+            zz5 = np.ones(shape=(res + 1, res + 1), dtype=float) * 5.0
+
+            d = -ppoints[-2].dot(normals[-2])
+            zzs = (-normals[-2][0] * xx - normals[-2][1] * yy - d) * 1. / normals[-2][2]
+
+            d = -ppoints[-1].dot(normals[-1])
+            zzs2 = (-normals[-1][0] * xx - normals[-1][1] * yy - d) * 1. / normals[-1][2]
+            sampled_points = np.array(
+                [[xx, zz, yy], [zz, yy, xx], [xx, yy, zz], [xxr, zzr, yyr], [zzr, yyr, xxr], [xxr, yyr, zzr],
+                 [xx, yy, zz5],
+                 [xx, yy, zzs], [xx, yy, zzs2]])
+
+        elif model == "double_split_cube":
+            ppoints = np.array(
+                [[0, 0, 0], [0, 0, 0], [0, 0, 0], [10, 10, 10], [10, 10, 10], [10, 10, 10], [5, 5, 5], [6, 6, 10]],
+                dtype=float)
+            normals = np.array(
+                [[0, -1, 0], [-1, 0, 0], [0, 0, -1], [0, 1, 0], [1, 0, 0], [0, 0, 1], [0, 0, 1], [0.5, 0, 0]],
+                dtype=float)
+            zz5 = np.ones(shape=(res + 1, res + 1), dtype=float) * 5.0
+
+            xxs, yys = np.meshgrid(np.linspace(6, res, num=res + 1, endpoint=True, dtype=float),
+                                   np.linspace(1, res, num=res + 1, endpoint=True, dtype=float))
+            zzs = np.zeros(shape=(res + 1, res + 1), dtype=float) + 6
+
+            sampled_points = np.array(
+                [[xx, zz, yy], [zz, yy, xx], [xx, yy, zz], [xxr, zzr, yyr], [zzr, yyr, xxr], [xxr, yyr, zzr],
+                 [xx, yy, zz5],
+                 [zzs, yys, xxs]])
+        elif model == "complex_cube":
+            ppoints = np.array(
+                [[0, 0, 0], [0, 0, 0], [0, 0, 0], [10, 10, 10], [10, 10, 10], [10, 10, 10], [5, 5, 5], [6, 6, 10],
+                 [4, 10, 10], [10, 12, 6]], dtype=float)
+            normals = np.array(
+                [[0, -1, 0], [-1, 0, 0], [0, 0, -1], [0, 1, 0], [1, 0, 0], [0, 0, 1], [0, 0, 1], [0.5, 0, 0],
+                 [0.5, 0, 0], [0, 0.5, 0]], dtype=float)
+
+            xx5, yy5 = np.meshgrid(np.linspace(1, res + 2, num=res + 1, endpoint=True, dtype=float),
+                                   np.linspace(1, res + 2, num=res + 1, endpoint=True, dtype=float))
+            zz5 = np.ones(shape=(res + 1, res + 1), dtype=float) * 5.0
+
+            xxs, yys = np.meshgrid(np.linspace(6, res, num=res + 1, endpoint=True, dtype=float),
+                                   np.linspace(6, res, num=res + 1, endpoint=True, dtype=float))
+            zzs = np.zeros(shape=(res + 1, res + 1), dtype=float) + 6
+
+            xxs2, yys2 = np.meshgrid(np.linspace(1, 4, num=res + 1, endpoint=True, dtype=float),
+                                     np.linspace(10.5, res + 2, num=res + 1, endpoint=True, dtype=float))
+            zzs2 = np.zeros(shape=(res + 1, res + 1), dtype=float) + 4
+
+            xxs3, yys3 = np.meshgrid(np.linspace(1, res - 6, num=res + 1, endpoint=True, dtype=float),
+                                     np.linspace(1, 4, num=res + 1, endpoint=True, dtype=float))
+            zzs3 = np.zeros(shape=(res + 1, res + 1), dtype=float) + 12
+
+            sampled_points = np.array(
+                [[xx, zz, yy], [zz, yy, xx], [xx, yy, zz], [xxr, zzr, yyr], [zzr, yyr, xxr], [xxr, yyr, zzr],
+                 [xx, yy, zz5],
+                 [zzs, yys, xxs], [zzs2, yys2, xxs2], [xxs3, zzs3, yys3]])
+        # elif model == "double_split_cube":
+        #     ppoints  = np.array([[0, 0, 0],[0, 0, 0],[0, 0, 0],[10, 10, 10],[10, 10, 10],[10, 10, 10],[5, 5, 5],[7.5, 7.5, 7.5]],dtype=float)
+        #     normals = np.array([[0, 1, 0],[1, 0, 0],[0, 0, 1],[0, -1, 0],[-1, 0, 0],[0, 0, -1],[0, 0, 1],[0, 0, 1]],dtype=float)
+        #
+        #     zz5 = np.ones(shape=(res + 1, res + 1), dtype=float) * 5.0
+        #     zz75 = np.ones(shape=(res + 1, res + 1), dtype=float) * 7.5
+        #     sampled_points = np.array(
+        #         [[xx, zz, yy], [zz, yy, xx], [xx, yy, zz], [xxr, zzr, yyr], [zzr, yyr, xxr], [xxr, yyr, zzr], [xx, yy, zz5], [xx, yy, zz75]])
+        else:
+            ppoints = np.array([[0, 0, 0], [0, 0, 0], [0, 0, 0], [10, 10, 10], [10, 10, 10], [10, 10, 10]], dtype=float)
+            normals = np.array([[0, -1, 0], [-1, 0, 0], [0, 0, -1], [0, 1, 0], [1, 0, 0], [0, 0, 1]], dtype=float)
+
+            sampled_points = np.array(
+                [[xx, zz, yy], [zz, yy, xx], [xx, yy, zz], [xxr, zzr, yyr], [zzr, yyr, xxr], [xxr, yyr, zzr]])
+
+        # a plane is a*x+b*y+c*z+d=0
+        # [a,b,c] is the normal. Thus, we have to calculate
+        # d and we're set
+
+        # plot the surface
+        fig = plt.figure()
+        ax = fig.add_subplot(projection='3d')
+
+        points = []
+        point_normals = []
+        group_parameters = []
+        group_colors = []
+        group_num_points = []
+        group_points = []
+        pl = 0
+        for i, (xx, yy, zz) in enumerate(sampled_points):
+            col = np.random.rand(1, 3)
+            group_colors.append(col * 255)
+
+            d = -ppoints[i].dot(normals[i])
+            plane = np.array([normals[i][0], normals[i][1], normals[i][2], d])
+            plane += (np.random.rand(4, ) * noise)
+            group_parameters.append(plane)
+            ax.plot_surface(xx, yy, zz, alpha=0.2, color=col)
+
+            p = np.vstack([xx.ravel(), yy.ravel(), zz.ravel()]).transpose().astype(float)
+            p += (np.random.rand(p.shape[0], 3) * noise)
+            points.append(p)
+            point_normals.append(np.repeat(normals[np.newaxis, i], p.shape[0], axis=0))
+            group_num_points.append([p.shape[0]])
+            group_points.append(np.arange(p.shape[0]) + pl)
+
+            pl += p.shape[0]
+
+        if plot:
+            plt.show()
+        else:
+            plt.close()
+
+        points = np.concatenate(points)
+        normals = np.concatenate(point_normals)
+        group_parameters = np.array(group_parameters)
+        np.random.seed(42)
+        group_colors = np.random.randint(low=100, high=255, size=(group_parameters.shape[0], 3), dtype=np.int32)
+        group_num_points = np.array(group_num_points, dtype=np.int32).flatten()
+        group_points = np.array(group_points, dtype=np.int32).flatten()
+
+        ### npz file
+        file = "/home/rsulzer/data/simple_shapes/{}/planes/planes.npz".format(model)
+        os.makedirs(os.path.dirname(file), exist_ok=True)
+        np.savez(file,
+                 points=points, normals=normals, group_parameters=group_parameters, group_colors=group_colors,
+                 group_num_points=group_num_points, group_points=group_points, colors=group_colors)
+
+        # ### pln file (simply the plane equations in a text file)
+        # file = "/home/rsulzer/data/reconbench/planes/{}/1/planes.pln".format(model)
+        # np.savetxt(file,group_parameters,'%.12g')
+
+        ### ply file (all convex hulls of all planes)
+        pt_file = "/home/rsulzer/data/simple_shapes/{}/planes/planes_sampled.ply".format(model)
+        plane_file = "/home/rsulzer/data/simple_shapes/{}/planes/planes.ply".format(model)
+        exp = PlaneExporter()
+        data = np.load(file)
+        exp.save_points_and_planes_from_array(plane_file, pt_file, data)
+
+        ### points file
+        os.makedirs(os.path.join(self.path,model,"pointcloud"),exist_ok=True)
+        file = "/home/rsulzer/data/simple_shapes/{}/pointcloud/pointcloud.ply".format(model)
+        pcd = o3d.geometry.PointCloud()
+        pcd.points = o3d.utility.Vector3dVector(points)
+        pcd.normals = o3d.utility.Vector3dVector(normals)
+        o3d.io.write_point_cloud(file, pcd)
+
+        np.savez_compressed(os.path.join(self.path,model,"pointcloud","pointcloud.npz"),points=points,normals=normals)
+
+
+
 
 if __name__ == '__main__':
 
-    ds = simpleShapes()
+    ds = SimpleShapes()
 
-    ds.getModels()
 
-    # ds.standardize()
-    # ds.sample(n_points=1000000)
+    # model = "cube"
+    model = "split_cube"
+    # model = "slanted_cube"
+    # model = "double_slanted_cube"
+    ds.make_planes(model,plot=True,noise=0.0)
 
-    ds.makePointcloudPLY(n_points=100000)
+
+
+
+
+
+
 
 
 

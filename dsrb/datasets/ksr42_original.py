@@ -1,4 +1,7 @@
-import os, sys, subprocess, trimesh, shutil
+import os, sys, subprocess, trimesh, shutil, json, time
+from datetime import datetime
+
+import pandas as pd
 from scan_settings import scan_settings
 from libmesh import check_mesh_contains
 from tqdm import tqdm
@@ -27,7 +30,6 @@ class KSR42Dataset_ori(DefaultDataset):
             if '' in categories:
                 categories.remove('')
             self.classes = categories
-
 
     def setup(self):
 
@@ -68,31 +70,44 @@ class KSR42Dataset_ori(DefaultDataset):
         for model in self.model_dicts:
 
 
-            path = os.path.join("/root/Downloads/Kinetic-Partition-3D-Benchmark/",model["class"],model["model"])
-            files = glob(model["path"]+"/*.vg")
+            path = os.path.join("/root/Downloads/Kinetic-Partition-3D-Benchmark/",model["class"],model["model"],"ours")
+            files = glob(path+"/*_params.txt")
 
             if not len(files) == 1:
                 print(model["path"])
                 continue
             else:
-                # pcd=o3d.io.read_point_cloud(files[0])
-                #
-                # os.makedirs(os.path.join(model["path"],"pointcloud"))
-                #
-                # if not pcd.has_normals():
-                #     o3d.geometry.estimate_normals(pcd)
-                #
-                # o3d.io.write_point_cloud(os.path.join(model["path"],"pointcloud","pointcloud.ply"),pcd)
-                #
-                # points = np.asarray(pcd.points)
-                # normals = np.asarray(pcd.normals)
-                #
-                # np.savez(os.path.join(model["path"],"pointcloud","pointcloud.npz"),points=points,normals=normals)
 
-                os.makedirs(os.path.join(model["path"],"planes"))
-                shutil.copyfile(files[0], os.path.join(os.path.join(model["path"],"planes","planes.vg")))
+                try:
+                    params_dict = {}
+                    with open(files[0], "r") as f:
+                        params = f.readlines()
 
-    def refine_planes(self):
+                    params_dict["min_inliers"] = int(params[3].split(":")[1])
+                    params_dict["epsilon"] = float(params[4].split(":")[1])
+                    if "Nearest neighbors" in params[5]:
+                        params_dict["normal_th"] = float(params[6].split(":")[1])
+                        params_dict["knn"] = int(params[5].split(":")[1])
+                    else:
+                        params_dict["normal_th"] = float(params[5].split(":")[1])
+                        params_dict["knn"] = int(10)
+
+
+                    pcd = o3d.io.read_point_cloud(model["pointcloud_ply"])
+                    diag = np.linalg.norm(pcd.get_min_bound() - pcd.get_max_bound())
+
+                    params_dict["epsilon"] /= diag
+
+
+                    with open(os.path.join(model["plane_params"]), "w") as outfile:
+                        # json_data refers to the above JSON
+                        json.dump(params_dict, outfile)
+
+                except:
+                    print("problem with model {}/{}".format(model["class"],model["model"]))
+
+
+    def detect_planes(self):
 
         for model in tqdm(self.model_dicts):
 
@@ -100,15 +115,15 @@ class KSR42Dataset_ori(DefaultDataset):
 
                 pd = psdr(1)
 
-                pd.load_points(model["planes_vg"])
+                pd.load_points(model["pointcloud_ply"])
 
-                pd.detect(min_inliers=10,epsilon=0.001)
+                with open(model["plane_params"],"r") as f:
+                    params = json.load(f)
+                params["epsilon"]= params["epsilon"]*model["bb_diagonal"]
+                pd.detect(params["min_inliers"],params["epsilon"],params["normal_th"],params["knn"])
+                pd.refine()
                 pd.save(model["planes"])
                 pd.save(model["planes_ply"])
-
-                # pd.refine()
-                #
-                # pd.save(model["planes"])
 
             except:
                 print("Problem with plane extraction for model {}/{}".format(model["class"],model["model"]))
@@ -116,7 +131,7 @@ class KSR42Dataset_ori(DefaultDataset):
 
 
 
-    def get_models(self,list="models.lst",hint=None):
+    def get_models(self,list="models.lst",names=None):
 
         for c in self.classes:
 
@@ -127,8 +142,8 @@ class KSR42Dataset_ori(DefaultDataset):
                 if m[0] == "#":
                     continue
 
-                if hint is not None:
-                    if hint not in m:
+                if names is not None:
+                    if m not in names:
                         continue
 
                 d = {}
@@ -138,16 +153,20 @@ class KSR42Dataset_ori(DefaultDataset):
 
                 d["pointcloud"] = os.path.join(self.path,c,m,"pointcloud","pointcloud.npz")
                 d["pointcloud_ply"] = os.path.join(self.path,c,m,"pointcloud","pointcloud.ply")
+                pcd = o3d.io.read_point_cloud(d["pointcloud_ply"])
+                d["bb_diagonal"] = np.linalg.norm(pcd.get_min_bound() - pcd.get_max_bound())
+
 
                 d["eval"] = dict()
                 d["eval"]["occ"] = None
                 d["eval"]["pointcloud"] = os.path.join(self.path,c,m,"pointcloud","pointcloud.npz")
 
-                d["mesh"] = None
+                d["mesh"] = os.path.join(self.path,c,m,"poisson","mesh.off")
 
                 d["planes_vg"] = os.path.join(self.path,c,m,"planes","planes.vg")
                 d["planes_ply"] = os.path.join(self.path,c,m,"planes","planes.ply")
                 d["planes"] = os.path.join(self.path,c,m,"planes","planes.npz")
+                d["plane_params"] = os.path.join(self.path,c,m,"planes","params.json")
 
                 d["ksr"] = {}
                 d["ksr"]["surface"] = os.path.join(self.path,c,m,"ksr",'{}','{}',"surface.off")
@@ -156,6 +175,13 @@ class KSR42Dataset_ori(DefaultDataset):
                 d["abspy"] = {}
                 d["abspy"]["surface"] = os.path.join(self.path,c,m,"abspy",'{}','{}',"surface.off")
                 d["abspy"]["partition"] = os.path.join(self.path,c,m,"abspy",'{}','{}',"partition.ply")
+
+                d["compod"] = {}
+                d["compod"]["surface"] = os.path.join(self.path,c,m,"compod","surface.ply")
+                d["compod"]["surface_simplified"] = os.path.join(self.path,c,m,"compod","surface_simplified.obj")
+                d["compod"]["partition"] = os.path.join(self.path,c,m,"compod","partition.ply")
+                d["compod"]["partition_pickle"] = os.path.join(self.path,c,m,"compod","partition")
+                d["compod"]["in_cells"] = os.path.join(self.path,c,m,"compod","in_cells.ply")
 
                 d["coacd"] = {}
                 d["coacd"]["surface"] = os.path.join(self.path,c,m,"coacd","in_cells.ply")
@@ -237,20 +263,39 @@ class KSR42Dataset_ori(DefaultDataset):
                 print(m["model"])
                 # raise
 
-    def make_poisson(self, depth=8, boundary=2):
+    def make_poisson(self, depth=6, boundary=2):
 
-
-        for m in tqdm(self.model_dicts, ncols=50):
+        time_dicts = []
+        for m in tqdm(self.model_dicts):
             # try:
-            command = [self.POISSON_EXE,
-                       "--in", m["scan_ply"],
-                       "--out", os.path.join(self.path, m["class"], m["mesh"][:-3]+"ply"),
+
+            td = {"class":m["class"],"model":m["model"]}
+            os.makedirs(os.path.dirname(m["mesh"]),exist_ok=True)
+            command = [self.poisson_exe,
+                       "--in", m["pointcloud_ply"],
+                       "--out", m["mesh"][:-4],
                        "--depth", str(depth),
                        "--bType", str(boundary)]
             print("run command: ", *command)
             p = subprocess.Popen(command)
             # p = subprocess.Popen(command, shell=False,stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+            t0 = time.time()
             p.wait()
+            td["poisson"] = time.time() - t0
+
+            time_dicts.append(td)
+
+            # poisson can only export to ply, change it to off
+            mesh = o3d.io.read_triangle_mesh(m["mesh"][:-4]+".ply")
+            o3d.io.write_triangle_mesh(m["mesh"],mesh)
+
+
+        df = pd.DataFrame(time_dicts)
+        outfile = os.path.join(self.path,"results", "compod", datetime.now().strftime("%m-%d-%Y-%H%M-%S")+"_poisson", "depth_{}.csv".format(depth))
+        os.makedirs(os.path.dirname(outfile),exist_ok=True)
+        df.to_csv(outfile)
+
+
 
 
     def standardize(self,padding=0.1):
@@ -310,16 +355,34 @@ class KSR42Dataset_ori(DefaultDataset):
 
     def move(self):
 
-        for m in self.model_dicts:
+        for model in self.model_dicts:
 
-            # inp = os.path.dirname(m["pointcloud"])
-            # out = os.path.join(os.path.dirname(m["pointcloud"]),"..","eval_unit")
-            # shutil.copytree(inp,out)
-            infile = m["qem"]["partition"].format("None").replace("qem","coacd")
-            outfile = m["coacd"]["partition"]
-            os.rename(infile,outfile)
-            os.rmdir(os.path.dirname(infile))
+            os.makedirs(os.path.join(self.path,model["class"],model["model"],"compod"),exist_ok=True)
 
+            file = os.path.join(self.path,model["class"],model["model"],"surface_simplified","{}_{}.obj".format(model["model"],model["class"]))
+            if os.path.isfile(file):
+                shutil.move(file,model["compod"]["surface_simplified"])
+                shutil.rmtree(os.path.join(self.path,model["class"],model["model"],"surface_simplified"))
+
+            file = os.path.join(self.path,model["class"],model["model"],"surface","{}_{}.ply".format(model["model"],model["class"]))
+            if os.path.isfile(file):
+                shutil.move(file,model["compod"]["surface"])
+                shutil.rmtree(os.path.join(self.path,model["class"],model["model"],"surface"))
+
+
+            file = os.path.join(self.path,model["class"],model["model"],"partition","partition.ply")
+            if os.path.isfile(file):
+                shutil.move(file,model["compod"]["partition"])
+                # os.remove(os.path.join(self.path,model["class"],model["model"],"partition"))
+
+
+            folder = os.path.join(self.path,model["class"],model["model"],"partition")
+            if os.path.isdir(folder):
+                shutil.move(folder,model["compod"]["partition_pickle"])
+                # os.remove(os.path.join(self.path,model["class"],model["model"],"partition"))
+
+
+            a=5
 
 
 
@@ -416,6 +479,9 @@ class KSR42Dataset_ori(DefaultDataset):
 
 if __name__ == '__main__':
 
-    ds = KSR42_ori()
+    ds = KSR42Dataset_ori()
     ds.get_models()
-    ds.refine_planes()
+    ds.make_poisson(depth=9)
+    # ds.setup()
+
+    # ds.detect_planes()

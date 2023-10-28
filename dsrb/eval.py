@@ -132,7 +132,7 @@ class MeshEvaluator:
 
         return iou
 
-    def get_surface_complexity(self,model,md,method):
+    def get_number_of_in_cells(self,model,md,method):
         if method['name'] == 'ksr':
             pp = method.get("grid", "")
             if len(pp) > 0:
@@ -140,23 +140,25 @@ class MeshEvaluator:
         else:
             pp = method.get("prioritise_planes", "")
 
-        if method["name"] not in ["qem"]:
-            if method["k"] is not None:
-                filename = os.path.join(model[method["name"]]["in_cells"].format(method["k"],pp))
-            else:
-                filename = model[method["name"]]["in_cells"]
-            if os.path.isfile(filename):
-                with open(filename, 'r') as f:
-                    f.readline()
-                    f.readline()
-                    md["in_cells"]= int(f.readline().split(":")[-1])
-            else:
-                self.logger.warning("{} missing for measuring surface complexity".format(filename))
+
+
+        if method["k"] is not None:
+            filename = os.path.join(model[method["name"]]["in_cells"].format(method["k"],pp))
+        else:
+            filename = model[method["name"]]["in_cells"]
+        if os.path.isfile(filename):
+            with open(filename, 'r') as f:
+                f.readline()
+                f.readline()
+                md["in_cells"]= int(f.readline().split(":")[-1])
+        else:
+            md["in_cells"] = -999999
+            # self.logger.warning("{} missing for measuring surface complexity".format(filename))
 
 
 
     def eval_mesh(self, mesh, pointcloud_tgt, normals_tgt,
-                  points_iou, occ_tgt):
+                  points_iou=None, occ_tgt=None):
         ''' Evaluates a mesh.
 
         Args:
@@ -194,22 +196,16 @@ class MeshEvaluator:
                 out_dict['boundary_edges'] = 0
                 out_dict['non-manifold_edges'] = 0
                 out_dict['watertight'] = 1
-                occ = check_mesh_contains(mesh, points_iou)
-                out_dict['iou'] = self.compute_iou(occ, occ_tgt)
+                if occ_tgt is not None:
+                    occ = check_mesh_contains(mesh, points_iou)
+                    out_dict['iou'] = self.compute_iou(occ, occ_tgt)
+                else:
+                    out_dict['iou'] = -99
                 return  out_dict
-
 
             out_dict['boundary_edges'] = np.asarray(o3dmesh.get_non_manifold_edges(allow_boundary_edges=False)).shape[0]
             out_dict['non-manifold_edges'] = np.asarray(o3dmesh.get_non_manifold_edges(allow_boundary_edges=True)).shape[0]
-
             out_dict['boundary_edges'] = out_dict['boundary_edges']-out_dict['non-manifold_edges']
-
-
-            # boundary edges that are not in non-manifold edges
-
-            # if(out_dict['boundary_edges'].shape[0]>0):
-            #     not_in = np.invert(np.isin(out_dict['non-manifold_edges'], out_dict['boundary_edges']).all(axis=1))
-            #     out_dict['boundary_edges'] = out_dict['boundary_edges'][not_in,:]
 
             if(out_dict['boundary_edges']>0):
                 # self.logger.warning("non watertight mesh!")
@@ -217,8 +213,11 @@ class MeshEvaluator:
                 out_dict['iou'] = 0.0
             else:
                 out_dict['watertight'] = 1
-                occ = check_mesh_contains(mesh, points_iou)
-                out_dict['iou'] = self.compute_iou(occ, occ_tgt)
+                if occ_tgt is not None:
+                    occ = check_mesh_contains(mesh, points_iou)
+                    out_dict['iou'] = self.compute_iou(occ, occ_tgt)
+                else:
+                    out_dict["iou"] = -99
 
             # out_dict['boundary_edges'] = out_dict['boundary_edges'].shape[0]
             # out_dict['non-manifold_edges'] = out_dict['non-manifold_edges'].shape[0]
@@ -383,12 +382,14 @@ class MeshEvaluator:
                 pointcloud = np.load(model["eval"]["pointcloud"])
                 pointcloud_tgt = pointcloud["points"]
                 normals_tgt = pointcloud["normals"]
-                points = np.load(model["eval"]["occ"])
-                points_tgt = points['points']
-                occ_tgt = np.unpackbits(points['occupancies'])
+                if model["eval"]["occ"] is not None:
+                    points = np.load(model["eval"]["occ"])
+                    points_tgt = points['points']
+                    occ_tgt = np.unpackbits(points['occupancies'])
+                    eval_dict_mesh = self.eval_mesh(mesh, pointcloud_tgt, normals_tgt, points_tgt, occ_tgt)
+                else:
+                    eval_dict_mesh = self.eval_mesh(mesh, pointcloud_tgt, normals_tgt)
 
-                eval_dict_mesh = self.eval_mesh(
-                    mesh, pointcloud_tgt, normals_tgt, points_tgt, occ_tgt)
 
                 ## get AABB of all points to compute AABB diagonal for scaling the n_sample_points_per_area value
                 ppmin = pointcloud_tgt.min(axis=0)
@@ -421,7 +422,8 @@ class MeshEvaluator:
                 md["surf_regions"] = np.nan
                 md["in_cells"] = np.nan
 
-                self.get_surface_complexity(model,md,method)
+                if "in_cells" in model[method["name"]].keys():
+                    self.get_number_of_in_cells(model,md,method)
 
                 self.eval_dicts.append(md)
 
@@ -442,7 +444,7 @@ class MeshEvaluator:
 
 
             except Exception as e:
-                # raise e
+                raise e
                 self.logger.error("{}".format(e))
                 self.logger.error("Skipping {}/{}".format(model["class"], model["model"]))
 

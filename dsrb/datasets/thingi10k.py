@@ -1,0 +1,161 @@
+import os
+import time
+import pandas as pd
+import open3d as o3d
+from tqdm import tqdm
+from default_dataset import DefaultDataset
+import numpy as np
+from pypsdr import psdr
+from datetime import datetime
+
+class Thingi10kDataset(DefaultDataset):
+
+
+
+    def __init__(self):
+        super().__init__()
+        self.path = os.path.join(self.path, "thingi10k")
+        self.model_dicts = []
+
+
+    def get_models(self,list=None,names=None):
+
+        if list is None:
+            models = os.listdir(self.path)
+            models = np.array(models)
+            models = np.sort(models)
+            models = models.astype(str)
+        else:
+            models = np.genfromtxt(os.path.join(self.path, list), dtype=str)
+
+        for m in models:
+
+            if m[0] == "#":
+                continue
+
+            if names is not None:
+                if m not in names:
+                    continue
+
+            d = {}
+            d["class"] = ""
+            d["model"] = m
+            d["path"] = os.path.join(self.path, m)
+
+            d["pointcloud"] = os.path.join(self.path, m, "pointcloud", "pointcloud.npz")
+            d["pointcloud_ply"] = os.path.join(self.path, m, "pointcloud", "pointcloud.ply")
+            # pcd = o3d.io.read_point_cloud(d["pointcloud_ply"])
+            # d["bb_diagonal"] = np.linalg.norm(pcd.get_min_bound() - pcd.get_max_bound())
+
+            d["eval"] = dict()
+            d["eval"]["occ"] = os.path.join(self.path, m, "eval", "points.npz")
+            d["eval"]["pointcloud"] = os.path.join(self.path, m, "eval", "pointcloud.npz")
+
+            d["mesh"] = os.path.join(self.path, m, "mesh.off")
+
+            d["planes_vg"] = os.path.join(self.path, m, "planes", "planes.vg")
+            d["planes_ply"] = os.path.join(self.path, m, "planes", "planes.ply")
+            d["planes"] = os.path.join(self.path, m, "planes", "planes.npz")
+            d["plane_params"] = os.path.join(self.path, m, "planes", "params.json")
+
+            d["ksr"] = {}
+            d["ksr"]["surface"] = os.path.join(self.path, m, "ksr", '{}', '{}', "surface.off")
+            d["ksr"]["partition"] = os.path.join(self.path, m, "ksr", '{}', '{}', "partition.ply")
+
+            d["abspy"] = {}
+            d["abspy"]["surface"] = os.path.join(self.path, m, "abspy", '{}', '{}', "surface.off")
+            d["abspy"]["partition"] = os.path.join(self.path, m, "abspy", '{}', '{}', "partition.ply")
+
+            d["compod"] = {}
+            d["compod"]["surface"] = os.path.join(self.path, m, "compod", "surface.ply")
+            d["compod"]["surface_simplified"] = os.path.join(self.path, m, "compod", "surface_simplified.obj")
+            d["compod"]["partition"] = os.path.join(self.path, m, "compod", "partition.ply")
+            d["compod"]["partition_pickle"] = os.path.join(self.path, m, "compod", "partition")
+            d["compod"]["in_cells"] = os.path.join(self.path, m, "compod", "in_cells.ply")
+
+            d["coacd"] = {}
+            d["coacd"]["surface"] = os.path.join(self.path, m, "coacd", "in_cells.ply")
+            d["coacd"]["partition"] = os.path.join(self.path, m, "coacd", "in_cells.ply")
+
+            d["qem"] = {}
+            d["qem"]["surface"] = os.path.join(self.path, m, "qem", '{}', "surface.off")
+            d["qem"]["partition"] = os.path.join(self.path, m, "qem", '{}', "in_cells.ply")
+
+            self.model_dicts.append(d)
+
+        return self.model_dicts
+
+
+    def setup(self):
+
+        models = os.listdir(os.path.join(self.path,"stl"))
+        for m in tqdm(models):
+
+            try:
+                mfile = os.path.join(self.path,"stl",m)
+                name = m[:-4]
+                mesh = o3d.io.read_triangle_mesh(mfile)
+                os.makedirs(os.path.join(self.path,name),exist_ok=True)
+                o3d.io.write_triangle_mesh(os.path.join(self.path,name,"mesh.off"),mesh)
+
+                a=5
+
+            except:
+                # raise e
+                pass
+
+    def detect_planes(self):
+
+        time_dicts = []
+        for model in tqdm(self.model_dicts):
+
+            params = {'min_inliers': 10, 'epsilon': 0.008, 'normal_th': 0.85}
+
+            try:
+
+                td = {"model":model["model"]}
+                psd = psdr(1)
+
+                pcd = o3d.io.read_point_cloud(model["pointcloud_ply"])
+                diag =  np.linalg.norm(pcd.get_min_bound() - pcd.get_max_bound())
+
+                psd.load_points(model["pointcloud_ply"])
+
+                params["epsilon"] = params["epsilon"]*diag
+                t0 = time.time()
+                psd.detect(**params)
+                td["detect"] = time.time() - t0
+                t0 = time.time()
+                psd.refine(max_seconds=180)
+                td["refine"] = time.time() - t0
+
+                psd.save(model["planes"])
+                psd.save(model["planes_ply"])
+
+                nplanes = np.load(model["planes"])["group_parameters"].shape[0]
+
+                td["n_planes"] = nplanes
+
+                time_dicts.append(td)
+
+            except Exception as e:
+                # raise e
+                print("Problem with plane extraction for model {}/{}".format(model["class"],model["model"]))
+
+
+        df = pd.DataFrame(time_dicts)
+        outfile = os.path.join(self.path,"results", "compod", datetime.now().strftime("%m-%d-%Y-%H%M-%S")+"_plane_detection", "{}.csv".format(str(params)))
+        os.makedirs(os.path.dirname(outfile),exist_ok=True)
+        df.to_csv(outfile)
+
+
+
+
+
+if __name__ == '__main__':
+
+    ds = Thingi10kDataset()
+    ds.get_models()
+    # ds.make_eval()
+    # ds.sample()
+    ds.detect_planes()
