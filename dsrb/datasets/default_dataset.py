@@ -105,7 +105,7 @@ class DefaultDataset:
 
     def estim_normals(self, method='jet', neighborhood=30, orient=1):
         if (len(self.model_dicts) < 1):
-            print("\nERROR: run getModels() first!")
+            print("\nERROR: run get_models() first!")
             sys.exit(1)
 
         for m in tqdm(self.model_dicts, disable=self.tqdm_disabled):
@@ -113,8 +113,8 @@ class DefaultDataset:
                 command = [str(os.path.join(self.mesh_tools_dir, "normal")),
                            "-w", str(self.path),
                            "-s", "npz",
-                           "-i", str(os.path.join("scan", m["model"], self.scan_conf + ".npz")),
-                           "-o", str(os.path.join("scan", m["model"], self.scan_conf)),
+                           "-i", str(m["pointcloud"]),
+                           "-o", str(m["pointcloud"]),
                            "--method", method,
                            "--neighborhood", str(neighborhood),
                            "--orient", str(orient),

@@ -133,19 +133,8 @@ class MeshEvaluator:
         return iou
 
     def get_number_of_in_cells(self,model,md,method):
-        if method['name'] == 'ksr':
-            pp = method.get("grid", "")
-            if len(pp) > 0:
-                pp = '{}{}{}'.format(pp[0], pp[1], pp[2])
-        else:
-            pp = method.get("prioritise_planes", "")
 
-
-
-        if method["k"] is not None:
-            filename = os.path.join(model[method["name"]]["in_cells"].format(method["k"],pp))
-        else:
-            filename = model[method["name"]]["in_cells"]
+        filename = model["output"]["in_cells"].format(str(method))
         if os.path.isfile(filename):
             with open(filename, 'r') as f:
                 f.readline()
@@ -277,7 +266,7 @@ class MeshEvaluator:
         '''
         # Return maximum losses if pointcloud is empty
         if pointcloud.shape[0] == 0:
-            logger.warning('Empty pointcloud / mesh!')
+            self.logger.warning('Empty pointcloud / mesh!')
             # out_dict = self.EMPTY_PCL_DICT.copy()
             # if normals is not None and normals_tgt is not None:
             #     out_dict.update(self.EMPTY_PCL_DICT_NORMALS)
@@ -358,7 +347,7 @@ class MeshEvaluator:
 
 
     def eval(self, models, method=None, outpath="",
-             scale=True, transform=False,
+             transform=False,
              group_by_class=True, export=False):
 
         self.eval_dicts=[]
@@ -370,14 +359,11 @@ class MeshEvaluator:
         for model in tqdm(models):
             try:
 
-                if not os.path.isfile(model[method["name"]]["surface"]):
-                    self.logger.warning("{} is not a file.".format(model[method["name"]]["surface"]))
+                if not os.path.isfile(model["output"]["surface"].format(str(method))):
+                    self.logger.warning("{} is not a file.".format(model["output"]["surface"].format(str(method))))
                     continue
-                mesh = trimesh.load(model[method["name"]]["surface"], process=False)
 
-                if(transform):
-                    R = np.array([[-1, 0, 0], [0, 0, 1], [0, 1, 0]], dtype=np.float32)
-                    mesh.vertices = np.matmul(mesh.vertices, R)
+                mesh = trimesh.load(model["output"]["surface"].format(str(method)), process=False)
 
                 pointcloud = np.load(model["eval"]["pointcloud"])
                 pointcloud_tgt = pointcloud["points"]
@@ -416,13 +402,20 @@ class MeshEvaluator:
                 md["boundary_edges"] = eval_dict_mesh["boundary_edges"]
                 md["non-manifold_edges"] = eval_dict_mesh["non-manifold_edges"]
                 md["watertight"] = eval_dict_mesh["watertight"]
-
                 md["surf_triangles"] = mesh.faces.shape[0]
                 md["surf_polygons"] = len(mesh.facets)
-                md["surf_regions"] = np.nan
+
+                if "surface_simplified" in model["output"]:
+                    if os.path.isfile(model["output"]["surface_simplified"].format(str(method))):
+                        mesh = trimesh.load(model["output"]["surface_simplified"].format(str(method)), process=False)
+                        self.logger.debug("Loading simplified surface for comlexity evaluation")
+                        md["surf_simpl_triangles"] = mesh.faces.shape[0]
+                        md["surf_simpl_polygons"] = len(mesh.facets)
+
+
                 md["in_cells"] = np.nan
 
-                if "in_cells" in model[method["name"]].keys():
+                if os.path.isfile(model["output"]["in_cells"].format(str(method))):
                     self.get_number_of_in_cells(model,md,method)
 
                 self.eval_dicts.append(md)
@@ -430,16 +423,10 @@ class MeshEvaluator:
                 if export:
                     assert(eval_dict_mesh["accuracy_pointcloud"] is not None and eval_dict_mesh["completeness_pointcloud"] is not None)
 
-                    if method['name'] == 'ksr':
-                        pp = method.get("grid", "")
-                        if len(pp) > 0:
-                            pp = '{}{}{}'.format(pp[0], pp[1], pp[2])
-                    else:
-                        pp = method.get("prioritise_planes", "")
-                    outfile = os.path.join(os.path.dirname(model[method["name"]]["surface"].format(method["k"],pp)),"accuracy_pc.ply")
+                    outfile = os.path.join(os.path.dirname(model["output"]["surface"].format(str(method))),"accuracy_pc.ply")
                     o3d.io.write_point_cloud(outfile,eval_dict_mesh["accuracy_pointcloud"])
 
-                    outfile = os.path.join(os.path.dirname(model[method["name"]]["surface"].format(method["k"],pp)),"completeness_pc.ply")
+                    outfile = os.path.join(os.path.dirname(model["output"]["surface"].format(str(method))),"completeness_pc.ply")
                     o3d.io.write_point_cloud(outfile,eval_dict_mesh["completeness_pointcloud"])
 
 
@@ -456,13 +443,7 @@ class MeshEvaluator:
 
         eval_df_full = pd.DataFrame(self.eval_dicts)
 
-        if method['name'] == 'ksr':
-            pp = method.get("grid", "")
-            if len(pp) > 0:
-                pp = '{}{}{}'.format(pp[0], pp[1], pp[2])
-        else:
-            pp = method.get("prioritise_planes", "")
-        op = os.path.join(outpath, "surface_full_{}{}{}.csv".format(method["name"],method["k"],pp))
+        op = os.path.join(outpath, "surface_full.csv")
         os.makedirs(os.path.join(outpath),exist_ok=True)
         eval_df_full.to_csv(op,float_format='%.3g')
 

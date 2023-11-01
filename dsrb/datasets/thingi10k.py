@@ -58,35 +58,23 @@ class Thingi10kDataset(DefaultDataset):
             d["planes"] = os.path.join(self.path, m, "planes", "planes.npz")
             d["plane_params"] = os.path.join(self.path, m, "planes", "params.json")
 
-            d["ksr"] = {}
-            d["ksr"]["surface"] = os.path.join(self.path, m, "ksr", '{}', '{}', "surface.off")
-            d["ksr"]["partition"] = os.path.join(self.path, m, "ksr", '{}', '{}', "partition.ply")
 
-            d["abspy"] = {}
-            d["abspy"]["surface"] = os.path.join(self.path, m, "abspy", '{}', '{}', "surface.off")
-            d["abspy"]["partition"] = os.path.join(self.path, m, "abspy", '{}', '{}', "partition.ply")
 
-            d["compod"] = {}
-            d["compod"]["surface"] = os.path.join(self.path, m, "compod", "surface.ply")
-            d["compod"]["surface_simplified"] = os.path.join(self.path, m, "compod", "surface_simplified.obj")
-            d["compod"]["partition"] = os.path.join(self.path, m, "compod", "partition.ply")
-            d["compod"]["partition_pickle"] = os.path.join(self.path, m, "compod", "partition")
-            d["compod"]["in_cells"] = os.path.join(self.path, m, "compod", "in_cells.ply")
+            d["output"] = {}
+            d["output"]["surface"] = os.path.join(self.path, m, "{}", "surface.ply")
+            d["output"]["surface_simplified"] = os.path.join(self.path, m, "{}", "surface_simplified.obj")
+            d["output"]["partition"] = os.path.join(self.path, m, "{}", "partition.ply")
+            d["output"]["partition_pickle"] = os.path.join(self.path, m, "{}", "partition")
+            d["output"]["in_cells"] = os.path.join(self.path, m, "{}", "in_cells.ply")
+            d["output"]["settings"] = os.path.join(self.path, m, "{}", "settings.yaml")
 
-            d["coacd"] = {}
-            d["coacd"]["surface"] = os.path.join(self.path, m, "coacd", "in_cells.ply")
-            d["coacd"]["partition"] = os.path.join(self.path, m, "coacd", "in_cells.ply")
-
-            d["qem"] = {}
-            d["qem"]["surface"] = os.path.join(self.path, m, "qem", '{}', "surface.off")
-            d["qem"]["partition"] = os.path.join(self.path, m, "qem", '{}', "in_cells.ply")
 
             self.model_dicts.append(d)
 
         return self.model_dicts
 
 
-    def setup(self):
+    def stl2off(self):
 
         models = os.listdir(os.path.join(self.path,"stl"))
         for m in tqdm(models):
@@ -103,6 +91,26 @@ class Thingi10kDataset(DefaultDataset):
             except:
                 # raise e
                 pass
+
+    def setup_lists(self):
+
+
+        simple = []
+        complex = []
+        onethousand = []
+        for m in tqdm(self.model_dicts[:1000]):
+
+            data = np.load(m["planes"])
+            if len(data["group_parameters"]) <=100:
+                simple.append(m["model"])
+            else:
+                complex.append(m["model"])
+
+            onethousand.append(m["model"])
+
+        np.savetxt(os.path.join(self.path,"simple.lst"), simple, fmt="%s")
+        np.savetxt(os.path.join(self.path,"complex.lst"), complex, fmt="%s")
+        np.savetxt(os.path.join(self.path,"1000.lst"), onethousand, fmt="%s")
 
     def detect_planes(self):
 
@@ -148,6 +156,14 @@ class Thingi10kDataset(DefaultDataset):
         os.makedirs(os.path.dirname(outfile),exist_ok=True)
         df.to_csv(outfile)
 
+    def rename(self):
+
+        for model in self.model_dicts:
+
+            rmesh = model["mesh"].replace("mesh","mesh_repaired")
+            if os.path.isfile(rmesh):
+                os.remove(model["mesh"])
+                os.rename(rmesh,model["mesh"])
 
 
 
@@ -155,7 +171,12 @@ class Thingi10kDataset(DefaultDataset):
 if __name__ == '__main__':
 
     ds = Thingi10kDataset()
-    ds.get_models()
+    ds.get_models(list="1000.lst")
+    # ds.rename()
+
+    # ds.setup_lists()
+
     # ds.make_eval()
     # ds.sample()
-    ds.detect_planes()
+    # ds.detect_planes()
+

@@ -119,8 +119,13 @@ class KSR42Dataset_ori(DefaultDataset):
 
                 with open(model["plane_params"],"r") as f:
                     params = json.load(f)
-                params["epsilon"]= params["epsilon"]*model["bb_diagonal"]
+
+                params["epsilon"] = params["epsilon"]*model["bb_diagonal"]
                 pd.detect(params["min_inliers"],params["epsilon"],params["normal_th"],params["knn"])
+
+                pd.save(model["planes"][:-4]+"_detected.npz")
+                # pd.save(model["planes_ply"][:-4]+"_detected.ply")
+
                 pd.refine()
                 pd.save(model["planes"])
                 pd.save(model["planes_ply"])
@@ -168,28 +173,13 @@ class KSR42Dataset_ori(DefaultDataset):
                 d["planes"] = os.path.join(self.path,c,m,"planes","planes.npz")
                 d["plane_params"] = os.path.join(self.path,c,m,"planes","params.json")
 
-                d["ksr"] = {}
-                d["ksr"]["surface"] = os.path.join(self.path,c,m,"ksr",'{}','{}',"surface.off")
-                d["ksr"]["partition"] = os.path.join(self.path,c,m,"ksr",'{}','{}',"partition.ply")
-
-                d["abspy"] = {}
-                d["abspy"]["surface"] = os.path.join(self.path,c,m,"abspy",'{}','{}',"surface.off")
-                d["abspy"]["partition"] = os.path.join(self.path,c,m,"abspy",'{}','{}',"partition.ply")
-
-                d["compod"] = {}
-                d["compod"]["surface"] = os.path.join(self.path,c,m,"compod","surface.ply")
-                d["compod"]["surface_simplified"] = os.path.join(self.path,c,m,"compod","surface_simplified.obj")
-                d["compod"]["partition"] = os.path.join(self.path,c,m,"compod","partition.ply")
-                d["compod"]["partition_pickle"] = os.path.join(self.path,c,m,"compod","partition")
-                d["compod"]["in_cells"] = os.path.join(self.path,c,m,"compod","in_cells.ply")
-
-                d["coacd"] = {}
-                d["coacd"]["surface"] = os.path.join(self.path,c,m,"coacd","in_cells.ply")
-                d["coacd"]["partition"] = os.path.join(self.path,c,m,"coacd","in_cells.ply")
-
-                d["qem"] = {}
-                d["qem"]["surface"] = os.path.join(self.path,c,m,"qem",'{}',"surface.off")
-                d["qem"]["partition"] = os.path.join(self.path,c,m,"qem",'{}',"in_cells.ply")
+                d["output"] = {}
+                d["output"]["surface"] = os.path.join(self.path,c, m, "{}", "surface.ply")
+                d["output"]["surface_simplified"] = os.path.join(self.path,c, m, "{}", "surface_simplified.obj")
+                d["output"]["partition"] = os.path.join(self.path,c, m, "{}", "partition.ply")
+                d["output"]["partition_pickle"] = os.path.join(self.path,c, m, "{}", "partition")
+                d["output"]["in_cells"] = os.path.join(self.path,c, m, "{}", "in_cells.ply")
+                d["output"]["settings"] = os.path.join(self.path,c, m, "{}", "settings.yaml")
 
                 self.model_dicts.append(d)
 
@@ -475,13 +465,21 @@ class KSR42Dataset_ori(DefaultDataset):
                 print(e)
                 print("Problem with {}".format(m["model"]))
 
+    def estimate_normals(self):
+
+        for m in self.model_dicts:
+            pcd = o3d.io.read_point_cloud(m["pointcloud_ply"])
+            o3d.geometry.estimate_normals(pcd)
+            o3d.io.write_point_cloud(m["pointcloud_ply"], pcd)
+
 
 
 if __name__ == '__main__':
 
     ds = KSR42Dataset_ori()
-    ds.get_models()
-    ds.make_poisson(depth=9)
+    ds.get_models(names="Church")
+    # ds.estimate_normals()
+    ds.make_poisson(depth=12)
     # ds.setup()
 
     # ds.detect_planes()

@@ -43,7 +43,7 @@ class SimpleShapes:
             d["pointcloud"] = os.path.join(self.path,d["class"],m,"pointcloud","pointcloud.npz")
             d["pointcloud_ply"] = os.path.join(self.path,d["class"],m,"pointcloud","pointcloud.ply")
 
-            d["mesh"] = os.path.join(self.path,d["class"],m,"mesh_unit.off")
+            d["mesh"] = os.path.join(self.path,d["class"],m,"mesh.off")
             d["planes"] = os.path.join(self.path,d["class"],m,"planes","planes.npz")
 
             d["ksr"] = {}
@@ -253,18 +253,17 @@ class SimpleShapes:
 
         if model == "split_cube":
             ppoints = np.array(
-                [[0, 0, 0], [0, 0, 0], [0, 0, 0], [10, 10, 10], [10, 10, 10], [10, 10, 10], [5, 5, 5], [5.3, 5.3, 5.3]],
+                [[5, 5, 5], [5.3, 5.3, 5.3], [0, 0, 0], [0, 0, 0], [0, 0, 0], [10, 10, 10], [10, 10, 10], [10, 10, 10]],
                 dtype=float)
             normals = np.array(
-                [[0, -1, 0], [-1, 0, 0], [0, 0, -1], [0, 1, 0], [1, 0, 0], [0, 0, 1], [0, 0, 1], [0, 0, 1]],
+                [[0, 0, 1], [0, 0, 1], [0, -1, 0], [-1, 0, 0], [0, 0, -1], [0, 1, 0], [1, 0, 0], [0, 0, 1]],
                 dtype=float)
 
             zz5 = np.ones(shape=(res + 1, res + 1), dtype=float) * 5.0
             zz6 = np.ones(shape=(res + 1, res + 1), dtype=float) * 5.3
 
             sampled_points = np.array(
-                [[xx, zz, yy], [zz, yy, xx], [xx, yy, zz], [xxr, zzr, yyr], [zzr, yyr, xxr], [xxr, yyr, zzr],
-                 [xx, yy, zz5], [xx, yy, zz6]])
+                [[xx, yy, zz5], [xx, yy, zz6],[xx, zz, yy], [zz, yy, xx], [xx, yy, zz], [xxr, zzr, yyr], [zzr, yyr, xxr], [xxr, yyr, zzr]])
 
 
         elif model == "slanted_cube":

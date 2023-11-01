@@ -12,7 +12,7 @@ DEBUG = 1
 
 
 
-class KSR42(DefaultDataset):
+class KSR42Dataset(DefaultDataset):
 
     def __init__(self,classes=[]):
         super().__init__()
@@ -27,7 +27,7 @@ class KSR42(DefaultDataset):
                 categories.remove('')
             self.classes = categories
 
-    def get_models(self,list="benchmark.lst",hint=None):
+    def get_models(self,list="benchmark.lst",names=None):
 
         for c in self.classes:
 
@@ -38,54 +38,38 @@ class KSR42(DefaultDataset):
                 if m[0] == "#":
                     continue
 
-                if hint is not None:
-                    if hint not in m:
+                if names is not None:
+                    if m not in names:
                         continue
 
                 d = {}
                 d["class"] = c
                 d["model"] = m
-                # d["scan_ply"] = glob(os.path.join(self.path,c,m,'*.ply'))[0]
-                d["scan"] = os.path.join(self.path,c,m,"pointcloud.npz")
-                if c == "Large":
-                    d["n_sample_points"] = 1000000
-                else:
-                    d["n_sample_points"] = 250000
 
                 d["eval"] = dict()
                 d["eval"]["occ"] = os.path.join(self.path,c,m,"eval","points.npz")
                 d["eval"]["pointcloud"] = os.path.join(self.path,c,m,"eval","pointcloud.npz")
                 d["eval"]["polygons"] = os.path.join(self.path,c,m,"eval","polygon_samples.npz")
 
-                d["pointcloud_ply"] = glob(os.path.join(self.path,c,m,"pointcloud","*.ply"))[0]
+                d["pointcloud"] = os.path.join(self.path, c, m, "planes", "{}.npz".format(m))
+                d["pointcloud_ply"] = os.path.join(self.path, c, m, "planes", "{}.ply".format(m))
                 d["mesh"] = os.path.join(self.path,c,m,"mesh.off")
                 # d["planes"] = os.path.join(self.path,c,m,"planes","planes.npz")
                 # d["planes"] = os.path.join(self.path,c,m,"planes_from_params","planes.npz")
-                d["ransac"] = os.path.join(self.path,c,m,"ransac","planes.npz")
 
-                try:
-                    d["planes_vg"] = glob(os.path.join(self.path,c,m,"planes_from_params","*.vg"))[0]
-                    d["planes"] = str(Path(d["planes_vg"]).with_suffix(".npz"))
-                except:
-                    print("Planes file {} does not exist".format(os.path.join(self.path,c,m,"planes_from_params","*.npz")))
+                d["planes_vg"] = os.path.join(self.path, c, m, "planes", "{}.vg".format(m))
+                d["planes_ply"] = os.path.join(self.path, c, m, "planes", "{}.ply".format(m))
+                d["planes"] = os.path.join(self.path, c, m, "planes", "{}.npz".format(m))
+                d["plane_params"] = os.path.join(self.path, c, m, "planes", "{}.json".format(m))
 
-                d["eval"]["pointcloud"] = str(Path(d["pointcloud_ply"]).with_suffix(".npz"))
 
-                d["ksr"] = {}
-                d["ksr"]["surface"] = os.path.join(self.path,c,m,"ksr",'{}','{}',"surface.off")
-                d["ksr"]["partition"] = os.path.join(self.path,c,m,"ksr",'{}','{}',"partition.ply")
-
-                d["abspy"] = {}
-                d["abspy"]["surface"] = os.path.join(self.path,c,m,"abspy",'{}','{}',"surface.off")
-                d["abspy"]["partition"] = os.path.join(self.path,c,m,"abspy",'{}','{}',"partition.ply")
-
-                d["coacd"] = {}
-                d["coacd"]["surface"] = os.path.join(self.path,c,m,"coacd","in_cells.ply")
-                d["coacd"]["partition"] = os.path.join(self.path,c,m,"coacd","in_cells.ply")
-
-                d["qem"] = {}
-                d["qem"]["surface"] = os.path.join(self.path,c,m,"qem",'{}',"surface.off")
-                d["qem"]["partition"] = os.path.join(self.path,c,m,"qem",'{}',"in_cells.ply")
+                d["output"] = {}
+                d["output"]["surface"] = os.path.join(self.path, c, m, "{}", "surface.ply")
+                d["output"]["surface_simplified"] = os.path.join(self.path, c, m, "{}", "surface_simplified.obj")
+                d["output"]["partition"] = os.path.join(self.path, c, m, "{}", "partition.ply")
+                d["output"]["partition_pickle"] = os.path.join(self.path, c, m, "{}", "partition")
+                d["output"]["in_cells"] = os.path.join(self.path, c, m, "{}", "in_cells.ply")
+                d["output"]["settings"] = os.path.join(self.path, c, m, "{}", "settings.yaml")
 
                 self.model_dicts.append(d)
 
