@@ -5,7 +5,6 @@ import open3d as o3d
 from tqdm import tqdm
 from default_dataset import DefaultDataset
 import numpy as np
-from pypsdr import psdr
 from datetime import datetime
 
 class Thingi10kDataset(DefaultDataset):
@@ -113,6 +112,11 @@ class Thingi10kDataset(DefaultDataset):
         np.savetxt(os.path.join(self.path,"1000.lst"), onethousand, fmt="%s")
 
     def detect_planes(self):
+
+        try:
+            from pypsdr import psdr
+        except:
+            pass # for importing default dataset in blender
 
         time_dicts = []
         for model in tqdm(self.model_dicts):

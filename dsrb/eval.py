@@ -414,6 +414,9 @@ class MeshEvaluator:
 
 
                 md["in_cells"] = np.nan
+                if "planes" in model:
+                    if os.path.isfile(model["planes"].format(str(method))):
+                        md["n_planes"] = np.load(model["planes"].format(str(method)))["group_parameters"].shape[0]
 
                 if os.path.isfile(model["output"]["in_cells"].format(str(method))):
                     self.get_number_of_in_cells(model,md,method)

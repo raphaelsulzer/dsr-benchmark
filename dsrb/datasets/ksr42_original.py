@@ -10,7 +10,6 @@ from glob import glob
 from pathlib import Path
 from default_dataset import DefaultDataset
 import open3d as o3d
-from pypsdr import psdr
 
 DEBUG = 1
 
@@ -107,34 +106,6 @@ class KSR42Dataset_ori(DefaultDataset):
                     print("problem with model {}/{}".format(model["class"],model["model"]))
 
 
-    def detect_planes(self):
-
-        for model in tqdm(self.model_dicts):
-
-            try:
-
-                pd = psdr(1)
-
-                pd.load_points(model["pointcloud_ply"])
-
-                with open(model["plane_params"],"r") as f:
-                    params = json.load(f)
-
-                params["epsilon"] = params["epsilon"]*model["bb_diagonal"]
-                pd.detect(params["min_inliers"],params["epsilon"],params["normal_th"],params["knn"])
-
-                pd.save(model["planes"][:-4]+"_detected.npz")
-                # pd.save(model["planes_ply"][:-4]+"_detected.ply")
-
-                pd.refine()
-                pd.save(model["planes"])
-                pd.save(model["planes_ply"])
-
-            except:
-                print("Problem with plane extraction for model {}/{}".format(model["class"],model["model"]))
-
-
-
 
     def get_models(self,list="models.lst",names=None):
 
@@ -183,6 +154,9 @@ class KSR42Dataset_ori(DefaultDataset):
 
                 self.model_dicts.append(d)
 
+        if not len(self.model_dicts):
+            print("ERROR: no models found!")
+            return None
         return self.model_dicts
 
 
@@ -473,13 +447,31 @@ class KSR42Dataset_ori(DefaultDataset):
             o3d.io.write_point_cloud(m["pointcloud_ply"], pcd)
 
 
+    def mesh_to_points(self):
+
+        for model in self.model_dicts:
+            mesh = o3d.io.read_triangle_mesh(model["mesh"])
+
+            mesh.compute_vertex_normals()
+
+            pcd = o3d.geometry.PointCloud()
+            pcd.points = mesh.vertices
+
+            pcd.normals = mesh.vertex_normals
+            o3d.io.write_point_cloud(model["pointcloud_ply"], pcd)
+
+            np.savez_compressed(model["pointcloud"],points=np.asarray(pcd.points),normals=np.asarray(pcd.normals))
+
+
 
 if __name__ == '__main__':
 
     ds = KSR42Dataset_ori()
     ds.get_models(names="Church")
-    # ds.estimate_normals()
-    ds.make_poisson(depth=12)
+    # ds.mesh_to_points()
+    # ds.estim_normals()
+    # ds.make_poisson(depth=12)
     # ds.setup()
 
-    # ds.detect_planes()
+    # ds.detect_planes({"min_inliers": 20, "epsilon": 0.001, "normal_th": 0.88},max_seconds=3600)
+    ds.detect_planes({"min_inliers": 30, "epsilon": 0.003, "normal_th": 0.85},max_seconds=3600)

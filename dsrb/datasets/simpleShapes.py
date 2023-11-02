@@ -8,7 +8,10 @@ import open3d as o3d
 import matplotlib.pyplot as plt
 plt.switch_backend('agg')  # there was some wired bug which is solved by this https://stackoverflow.com/a/67617670
 
-from pycompod import PlaneExporter
+try:
+    from pycompod import PlaneExporter
+except:
+    pass # for importing default dataset in blender
 
 DEBUG = 0
 

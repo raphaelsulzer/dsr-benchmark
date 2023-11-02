@@ -8,7 +8,7 @@ from glob import glob
 from converter import Converter
 from pathlib import Path
 import matplotlib.colors as mcolors
-
+from copy import deepcopy
 
 class DefaultDataset:
 
@@ -60,11 +60,11 @@ class DefaultDataset:
             p.wait()
 
 
-    def sample(self,n_points=1000000):
+    def sample(self,n_points=1000000,overwrite=True):
 
         for m in tqdm(self.model_dicts, disable=self.tqdm_disabled):
 
-            if os.path.isfile(m["pointcloud_ply"]):
+            if os.path.isfile(m["pointcloud_ply"]) and not overwrite:
                 continue
             try:
                 os.makedirs(os.path.dirname(m["pointcloud"]), exist_ok=True)
@@ -103,7 +103,7 @@ class DefaultDataset:
 
 
 
-    def estim_normals(self, method='jet', neighborhood=30, orient=1):
+    def estim_normals(self, method='jet', neighborhood=30, orient=2):
         if (len(self.model_dicts) < 1):
             print("\nERROR: run get_models() first!")
             sys.exit(1)
@@ -111,10 +111,10 @@ class DefaultDataset:
         for m in tqdm(self.model_dicts, disable=self.tqdm_disabled):
             try:
                 command = [str(os.path.join(self.mesh_tools_dir, "normal")),
-                           "-w", str(self.path),
-                           "-s", "npz",
-                           "-i", str(m["pointcloud"]),
-                           "-o", str(m["pointcloud"]),
+                           # "-w", str(self.path),
+                           "-s", "ply",
+                           "-i", str(m["pointcloud_ply"]),
+                           "-o", str(m["pointcloud_ply"]),
                            "--method", method,
                            "--neighborhood", str(neighborhood),
                            "--orient", str(orient),
@@ -338,7 +338,15 @@ class DefaultDataset:
 
         return vedo.merge(meshes), len(meshes)
 
-    def recolor_in_cells(self,method,colors = ["#CC99C9","#9EC1CF","#9EE09E","#FDFD97","#FEB144","#FF6663"],backend="vedo"):
+    def recolor_in_cells(self,method,colors = "pale",backend="vedo"):
+
+        if isinstance(colors,str):
+            if colors == "saturated":
+                colors = ["#ff0000", "#f4ec00", "#01ffff", "#ff7f00", "#0000ff", "#00ff01", "#6f00d8", "#ff00ff"]
+            elif colors == "pale":
+                colors = ["#CC99C9","#9EC1CF","#9EE09E","#FDFD97","#FEB144","#FF6663"]
+            else:
+                print("Don't know that color type")
 
         for model in tqdm(self.model_dicts, disable=self.tqdm_disabled):
 
@@ -359,14 +367,20 @@ class DefaultDataset:
                 mesh, n = self.color_mesh_by_component_trimesh(mesh,colors)
                 mesh.export(outfile)
 
-    def recolor_planes(self, colors = None):
+    def recolor_planes(self, colors = "pale"):
 
         from pycompod import PlaneExporter
 
         # standard colors:
         # https://coolors.co/ff0000-f4ec00-01ffff-ff7f00-0000ff-00ff01-6f00d8-ff00ff
-        if colors is None:
-            colors = ["#ff0000", "#f4ec00", "#01ffff", "#ff7f00", "#0000ff", "#00ff01", "#6f00d8", "#ff00ff"]
+        if isinstance(colors,str):
+            if colors == "saturated":
+                colors = ["#ff0000", "#f4ec00", "#01ffff", "#ff7f00", "#0000ff", "#00ff01", "#6f00d8", "#ff00ff"]
+            elif colors == "pale":
+                colors = ["#CC99C9","#9EC1CF","#9EE09E","#FDFD97","#FEB144","#FF6663"]
+            else:
+                print("Don't know that color type")
+
 
         rgb_colors = []
         for col in colors:
@@ -389,6 +403,39 @@ class DefaultDataset:
             data["colors"] = rgb_colors[colors]
             plane_file = model["planes"][:-4]+"_recolored.ply"
             pt_file = model["planes"][:-4]+"_samples_recolored.ply"
-            pe.save_points_and_planes_from_array([plane_file, pt_file], data)
+            pe.save_points_and_planes_from_array(plane_filename=plane_file, point_filename=pt_file, planes_array=data)
 
 
+
+    def detect_planes(self,params,max_seconds=-1,max_iterations=-1):
+
+        try:
+            from pypsdr import psdr # for importing the default_dataset in blender
+        except:
+            pass
+        import json
+
+        for model in self.model_dicts:
+
+            print("Process {}/{}".format(model["class"],model["model"]))
+
+            par = deepcopy(params)
+            ## get bounding box diagonal
+            pcd = o3d.io.read_point_cloud(model["pointcloud_ply"])
+            diag = np.linalg.norm(pcd.get_min_bound() - pcd.get_max_bound())
+            par["epsilon"] *= diag
+            ## extract planes
+            psd = psdr(1)
+            psd.load_points(np.asarray(pcd.points), np.asarray(pcd.normals))
+            psd.detect(**par)
+            psd.save(model["planes"].replace(".npz","_detected.npz"))
+            psd.save(model["planes_ply"].replace(".ply","_detected.ply"))
+            # psd.set_discretization()
+            psd.refine(max_seconds=max_seconds,max_iterations=max_iterations)
+            psd.save(model["planes"])
+            psd.save(model["planes_ply"])
+
+
+            with open(model["plane_params"], "w") as outfile:
+                # json_data refers to the above JSON
+                json.dump(params, outfile)

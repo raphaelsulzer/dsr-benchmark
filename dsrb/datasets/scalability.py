@@ -72,27 +72,13 @@ class ScalabilityDataset(DefaultDataset):
                 d["planes_ply"] = os.path.join(self.path,"planes",s,m+".ply")
                 d["plane_params"] = os.path.join(self.path,"planes",s,m+".json")
 
-                d["ksr"] = {}
-                d["ksr"]["surface"] = os.path.join(self.path,"ksr",'{}','{}',s,m,"surface.off")
-                d["ksr"]["partition"] = os.path.join(self.path,"ksr",'{}','{}',s,m,"partition.ply")
-
-                d["abspy"] = {}
-                d["abspy"]["surface"] = os.path.join(self.path,"abspy",'{}','{}',s,m,"surface.off")
-                d["abspy"]["partition"] = os.path.join(self.path,"abspy",'{}','{}',s,m,"partition.ply")
-
-                d["coacd"] = {}
-                d["coacd"]["partition"] = os.path.join(self.path,"coacd",s,m,"in_cells.ply")
-                d["coacd"]["surface"] = os.path.join(self.path,"coacd",s,m,"in_cells.ply")
-                d["coacd"]["in_cells"] = os.path.join(self.path,"coacd",s,m,"in_cells.ply")
-
-                d["compod"] = {}
-                d["compod"]["partition"] = os.path.join(self.path,"output","partition","{}_{}.ply".format(m,s))
-                d["compod"]["surface"] = os.path.join(self.path,"output","surface","{}_{}.ply".format(m,s))
-                d["compod"]["in_cells"] = os.path.join(self.path,"output","in_cells","{}_{}.ply".format(m,s))
-
-                d["qem"] = {}
-                d["qem"]["partition"] = os.path.join(self.path,"qem",'{}',s,m,"in_cells.ply")
-                d["qem"]["surface"] = os.path.join(self.path,"qem",'{}',s,m,"surface.ply")
+                d["output"] = {}
+                d["output"]["surface"] = os.path.join(self.path, s, m, "{}", "surface.ply")
+                d["output"]["surface_simplified"] = os.path.join(self.path, s, m, "{}", "surface_simplified.obj")
+                d["output"]["partition"] = os.path.join(self.path, s, m, "{}", "partition.ply")
+                d["output"]["partition_pickle"] = os.path.join(self.path, s, m, "{}", "partition")
+                d["output"]["in_cells"] = os.path.join(self.path, s, m, "{}", "in_cells.ply")
+                d["output"]["settings"] = os.path.join(self.path, s, m, "{}", "settings.yaml")
 
                 self.model_dicts.append(d)
 

@@ -51,8 +51,8 @@ class KSR42Dataset(DefaultDataset):
                 d["eval"]["pointcloud"] = os.path.join(self.path,c,m,"eval","pointcloud.npz")
                 d["eval"]["polygons"] = os.path.join(self.path,c,m,"eval","polygon_samples.npz")
 
-                d["pointcloud"] = os.path.join(self.path, c, m, "planes", "{}.npz".format(m))
-                d["pointcloud_ply"] = os.path.join(self.path, c, m, "planes", "{}.ply".format(m))
+                d["pointcloud"] = os.path.join(self.path, c, m, "pointcloud", "{}.npz".format(m))
+                d["pointcloud_ply"] = os.path.join(self.path, c, m, "pointcloud", "{}.ply".format(m))
                 d["mesh"] = os.path.join(self.path,c,m,"mesh.off")
                 # d["planes"] = os.path.join(self.path,c,m,"planes","planes.npz")
                 # d["planes"] = os.path.join(self.path,c,m,"planes_from_params","planes.npz")
@@ -73,6 +73,9 @@ class KSR42Dataset(DefaultDataset):
 
                 self.model_dicts.append(d)
 
+        if not len(self.model_dicts):
+            print("ERROR: no models found!")
+            return None
         return self.model_dicts
 
 
@@ -322,8 +325,11 @@ class KSR42Dataset(DefaultDataset):
 
 if __name__ == '__main__':
 
-    ds = KSR42(classes="Large")
-    ds.get_models(hint="City")
+    ds = KSR42Dataset(classes="Cities")
+    ds.get_models(names="chicago")
+    # ds.sample(n_points=10000000)
+    ds.detect_planes({"min_inliers": 12, "epsilon": 0.0003, "normal_th": 0.95},max_seconds=3600)
+
 
     # ds.move()
 
@@ -336,8 +342,7 @@ if __name__ == '__main__':
     #
     #
     # # ds.standardize()
-    # ds.sample(n_points=1000000,unit=False,pointcloud=False)
 
     # ds.convert()
 
-    ds.make_eval(n_points=5000000,occ=True)
+    # ds.make_eval(n_points=5000000,occ=True)
