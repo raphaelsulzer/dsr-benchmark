@@ -4,13 +4,14 @@ import shutil
 sys.path.append(os.path.join(os.path.dirname(__file__)))
 from scan_settings import scan_settings
 from tqdm import tqdm
+from default_dataset import DefaultDataset
 
-
-class ShapeNet:
+class ShapeNet(DefaultDataset):
 
     def __init__(self,path="/home/rsulzer/data/ShapeNet",
                  classes=[],
                  mesh_tools_dir="/home/raphael/cpp/mesh-tools/build/release"):
+        super().__init__()
 
         self.path = path
         self.mesh_tools_dir = mesh_tools_dir
@@ -49,7 +50,10 @@ class ShapeNet:
         else:
             temp = []
             for c in classes:
-                temp.append(self.metadata[c])
+                if c.isnumeric():
+                    temp.append(c)
+                else:
+                    temp.append(self.metadata[c])
             self.classes = temp
 
 
@@ -70,15 +74,23 @@ class ShapeNet:
                     print(e)
                     print("Skipping {}/{}".format(m["class"], m["model"]))
 
-    def get_models(self,splits=["train","val","test"],scan_conf="4",reduce=None,hint=None):
+    def get_models(self,splits=["train","val","test"],scan_conf="4",reduce=None,names=None):
+        
         self.scan_conf = scan_conf
         self.splits = splits
+
+        if names is not None:
+            if not isinstance(names,list):
+                names = [names]
+
         for s in splits:
             class_list = []
             for c in self.classes:
                 split_file = os.path.join(self.path, c, s + '.lst')
+
                 with open(split_file, 'r') as f:
                     models = f.read().split('\n')
+
                 if '' in models:
                     models.remove('')
 
@@ -87,8 +99,8 @@ class ShapeNet:
 
                 for m in models:
 
-                    if hint is not None:
-                        if hint not in m:
+                    if names is not None:
+                        if m not in names:
                             continue
 
                     d = {}
@@ -105,7 +117,10 @@ class ShapeNet:
 
             self.model_dicts[s] = class_list
 
+        if len(splits) == 1:
+            self.model_dicts = self.model_dicts[splits[0]]
         return self.model_dicts
+
 
     def get_by_id(self,id="0000"):
 
@@ -193,18 +208,21 @@ class ShapeNet:
 
 if __name__ == '__main__':
 
-    ds = ShapeNet()
-    ds.get_models()
+    id = "d1f68ceddaa3b0bcfebad4f49b26ec52"
+
+    ds = ShapeNet(
+        classes=['04256520', '03636649', '04401088', '04530566', '03691459', '03001627', '04379243', '03211117',
+                 '04090263'])
+    split = "bspnet"
+    ds.get_models(splits=[split], names=id)
+
+    ds.make_eval()
     # ds.setup()
     # ds.get_models(reduce=0.01)
     # ds.standardize()
     # ds.sample(n_points=100000)
 
-    for split in tqdm(ds.model_dicts):
 
-        for model in ds.model_dicts[split]:
 
-            if os.path.isfile(os.path.join(model["path"],"eval","points.npz")):
-                shutil.rmtree(os.path.join(model["path"],"eval"))
 
-            a=5
+

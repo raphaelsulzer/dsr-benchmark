@@ -32,6 +32,12 @@ class Thingi10kDataset(DefaultDataset):
             if m[0] == "#":
                 continue
 
+            if not os.path.isdir(os.path.join(self.path,m)):
+                continue
+
+            if m == "results":
+                continue
+
             if names is not None:
                 if m not in names:
                     continue
@@ -94,21 +100,27 @@ class Thingi10kDataset(DefaultDataset):
     def setup_lists(self):
 
 
-        simple = []
-        complex = []
+        small = []
+        medium = []
+        large = []
         onethousand = []
         for m in tqdm(self.model_dicts[:1000]):
 
+
             data = np.load(m["planes"])
-            if len(data["group_parameters"]) <=100:
-                simple.append(m["model"])
+            num_planes = len(data["group_parameters"])
+            if num_planes <=100:
+                small.append(m["model"])
+            elif num_planes <= 250:
+                medium.append(m["model"])
             else:
-                complex.append(m["model"])
+                large.append(m["model"])
 
             onethousand.append(m["model"])
 
-        np.savetxt(os.path.join(self.path,"simple.lst"), simple, fmt="%s")
-        np.savetxt(os.path.join(self.path,"complex.lst"), complex, fmt="%s")
+        np.savetxt(os.path.join(self.path,"small.lst"), small, fmt="%s")
+        np.savetxt(os.path.join(self.path,"medium.lst"), medium, fmt="%s")
+        np.savetxt(os.path.join(self.path,"large.lst"), large, fmt="%s")
         np.savetxt(os.path.join(self.path,"1000.lst"), onethousand, fmt="%s")
 
     def detect_planes(self):
@@ -175,10 +187,10 @@ class Thingi10kDataset(DefaultDataset):
 if __name__ == '__main__':
 
     ds = Thingi10kDataset()
-    ds.get_models(list="1000.lst")
+    ds.get_models()
     # ds.rename()
 
-    # ds.setup_lists()
+    ds.setup_lists()
 
     # ds.make_eval()
     # ds.sample()

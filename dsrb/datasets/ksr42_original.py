@@ -467,11 +467,12 @@ class KSR42Dataset_ori(DefaultDataset):
 if __name__ == '__main__':
 
     ds = KSR42Dataset_ori()
-    ds.get_models(names="Church")
-    # ds.mesh_to_points()
+    ds.get_models(names="Meeting_room")
     # ds.estim_normals()
-    # ds.make_poisson(depth=12)
+    ds.make_poisson(depth=12)
+    ds.mesh_to_points()
+
     # ds.setup()
 
-    # ds.detect_planes({"min_inliers": 20, "epsilon": 0.001, "normal_th": 0.88},max_seconds=3600)
-    ds.detect_planes({"min_inliers": 30, "epsilon": 0.003, "normal_th": 0.85},max_seconds=3600)
+    ds.detect_planes({"min_inliers": 20, "epsilon": 0.001, "normal_th": 0.88},max_seconds=3600)
+    # ds.detect_planes({"min_inliers": 30, "epsilon": 0.003, "normal_th": 0.85},max_seconds=21600)

@@ -1,4 +1,8 @@
-import os, sys, subprocess, pathlib, shutil, trimesh, vedo
+import os, sys, subprocess, trimesh
+try:
+    import vedo
+except:
+    pass
 from libmesh import check_mesh_contains
 from tqdm import tqdm
 import numpy as np
@@ -10,15 +14,25 @@ from pathlib import Path
 import matplotlib.colors as mcolors
 from copy import deepcopy
 
+
+
+
 class DefaultDataset:
 
-    def __init__(self,path="/home/rsulzer/data",
+    def __init__(self,classes = None,
                  mesh_tools_dir="/home/rsulzer/cpp/mesh-tools/build/release",
                  poisson_exe = "/home/rsulzer/cpp/PoissonRecon/Bin/Linux/PoissonRecon",
                  tqdm_enabled=True,
                  debug_export=False):
 
-        self.path = path
+        data_dir_file = os.path.join(os.path.dirname(__file__),"..","..","DATA_DIR.txt")
+        if not os.path.isfile(data_dir_file):
+            print("Could not find {}. Please put a file called DATA_DIR.txt in the root folder of this porject which points to your dataset directory.".format(data_dir_file))
+
+        with open(data_dir_file,"r") as f:
+            data_dir = f.readline()
+
+        self.path = data_dir
 
         self.model_dicts = []
         self.mesh_tools_dir = mesh_tools_dir
@@ -27,6 +41,13 @@ class DefaultDataset:
         self.debug_export = debug_export
 
         self.tqdm_disabled = not tqdm_enabled
+
+        # if classes is None:
+        #     with open(os.path.join(self.path, "classes.lst"), 'r') as f:
+        #         cl = f.read().split('\n')
+        #     if '' in cl:
+        #         cl.remove('')
+        #     self.classes = cl
 
 
     def scan(self,scan_setting="4",scanner_dir="/home/raphael/cpp/mesh-tools/build/release/scan",
@@ -303,7 +324,7 @@ class DefaultDataset:
                         o3d.io.write_point_cloud(str(Path(m["eval"]["occ"]).with_suffix(".ply")), pcd)
 
             except Exception as e:
-                # raise e
+                raise e
                 print(e)
                 print("Problem with {}".format(m["model"]))
 
