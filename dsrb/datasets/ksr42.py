@@ -27,7 +27,7 @@ class KSR42Dataset(DefaultDataset):
                 categories.remove('')
             self.classes = categories
 
-    def get_models(self,list="benchmark.lst",names=None):
+    def get_models(self,list="models.lst",names=None):
 
         for c in self.classes:
 
@@ -47,9 +47,9 @@ class KSR42Dataset(DefaultDataset):
                 d["model"] = m
 
                 d["eval"] = dict()
-                d["eval"]["occ"] = os.path.join(self.path,c,m,"eval","points.npz")
-                d["eval"]["pointcloud"] = os.path.join(self.path,c,m,"eval","pointcloud.npz")
-                d["eval"]["polygons"] = os.path.join(self.path,c,m,"eval","polygon_samples.npz")
+                d["eval"]["occ"] = os.path.join(self.path, c, m, "eval","points.npz")
+                d["eval"]["pointcloud"] = os.path.join(self.path,c, m, "eval","pointcloud.npz")
+                d["eval"]["polygons"] = os.path.join(self.path,c, m, "eval","polygon_samples.npz")
 
                 d["pointcloud"] = os.path.join(self.path, c, m, "pointcloud", "{}.npz".format(m))
                 d["pointcloud_ply"] = os.path.join(self.path, c, m, "pointcloud", "{}.ply".format(m))
@@ -62,13 +62,12 @@ class KSR42Dataset(DefaultDataset):
                 d["planes"] = os.path.join(self.path, c, m, "planes", "{}.npz".format(m))
                 d["plane_params"] = os.path.join(self.path, c, m, "planes", "{}.json".format(m))
 
-
                 d["output"] = {}
                 d["output"]["surface"] = os.path.join(self.path, c, m, "{}", "surface.ply")
                 d["output"]["surface_simplified"] = os.path.join(self.path, c, m, "{}", "surface_simplified.obj")
                 d["output"]["partition"] = os.path.join(self.path, c, m, "{}", "partition.ply")
                 d["output"]["partition_pickle"] = os.path.join(self.path, c, m, "{}", "partition")
-                d["output"]["in_cells"] = os.path.join(self.path, c, m, "{}", "in_cells.ply")
+                d["output"]["in_cells"] = os.path.join(self.path, c, m, "{}", "in_cells.obj")
                 d["output"]["settings"] = os.path.join(self.path, c, m, "{}", "settings.yaml")
 
                 self.model_dicts.append(d)
@@ -145,21 +144,6 @@ class KSR42Dataset(DefaultDataset):
             except:
                 print(m["model"])
                 # raise
-
-    def make_poisson(self, depth=8, boundary=2):
-
-
-        for m in tqdm(self.model_dicts, ncols=50):
-            # try:
-            command = [self.POISSON_EXE,
-                       "--in", m["scan_ply"],
-                       "--out", os.path.join(self.path, m["class"], m["mesh"][:-3]+"ply"),
-                       "--depth", str(depth),
-                       "--bType", str(boundary)]
-            print("run command: ", *command)
-            p = subprocess.Popen(command)
-            # p = subprocess.Popen(command, shell=False,stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-            p.wait()
 
 
     def standardize(self,padding=0.1):
@@ -326,9 +310,11 @@ class KSR42Dataset(DefaultDataset):
 if __name__ == '__main__':
 
     ds = KSR42Dataset(classes="Cities")
-    ds.get_models(names="chicago")
+    ds.get_models(names="huawei")
+
+    ds.make_poisson(depth=11)
     # ds.sample(n_points=10000000)
-    ds.detect_planes({"min_inliers": 12, "epsilon": 0.0003, "normal_th": 0.95},max_seconds=3600)
+    # ds.detect_planes({"min_inliers": 12, "epsilon": 0.0003, "normal_th": 0.95},max_seconds=3600)
 
 
     # ds.move()

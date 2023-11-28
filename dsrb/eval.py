@@ -2,6 +2,8 @@ import logging
 import numpy as np
 import trimesh
 import sys, os
+
+import vedo
 from scipy.spatial import cKDTree
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from libmesh import check_mesh_contains
@@ -135,14 +137,17 @@ class MeshEvaluator:
     def get_number_of_in_cells(self,model,md,method):
 
         filename = model["output"]["in_cells"].format(str(method))
-        if os.path.isfile(filename):
-            with open(filename, 'r') as f:
-                f.readline()
-                f.readline()
-                md["in_cells"]= int(f.readline().split(":")[-1])
-        else:
-            md["in_cells"] = -999999
-            # self.logger.warning("{} missing for measuring surface complexity".format(filename))
+        md["in_cells"] = len(vedo.load(filename).split(maxdepth=100000))
+
+
+        # if os.path.isfile(filename):
+        #     with open(filename, 'r') as f:
+        #         f.readline()
+        #         f.readline()
+        #         md["in_cells"]= int(f.readline().split(":")[-1])
+        # else:
+        #     md["in_cells"] = -999999
+        #     # self.logger.warning("{} missing for measuring surface complexity".format(filename))
 
 
 
@@ -235,17 +240,21 @@ class MeshEvaluator:
         # look up cmaps here: https://matplotlib.org/stable/tutorials/colors/colormaps.html, use _r to reverse them
         cmap = 'hot_r'
 
+        pcdc = o3d.geometry.PointCloud()
+        pcdc.points = o3d.utility.Vector3dVector(pointcloud_tgt)
+        diag = np.linalg.norm(pcdc.get_min_bound() - pcdc.get_max_bound())
+
         pcda = o3d.geometry.PointCloud()
         pcda.points = o3d.utility.Vector3dVector(pointcloud)
         # pcda.normals = o3d.utility.Vector3dVector(normals)
-        cols=GradientColor2D(cmap, np.percentile(accuracy,percentile[0]), np.percentile(accuracy,percentile[1])).get_rgb(accuracy)
+        # cols=GradientColor2D(cmap, np.percentile(accuracy,percentile[0]), np.percentile(accuracy,percentile[1])).get_rgb(accuracy)
+        cols = GradientColor2D(cmap,0.0001*diag,0.03*diag).get_rgb(accuracy)
         # cols=MplColorHelper(cmap, accuracy.min(), accuracy.max()).get_rgb(accuracy)
         pcda.colors = o3d.utility.Vector3dVector(cols[:,:3])
 
-        pcdc = o3d.geometry.PointCloud()
-        pcdc.points = o3d.utility.Vector3dVector(pointcloud_tgt)
         # pcdc.normals = o3d.utility.Vector3dVector(normals_tgt)
-        cols=GradientColor2D(cmap, np.percentile(completeness,percentile[0]), np.percentile(completeness,percentile[1])).get_rgb(completeness)
+        # cols=GradientColor2D(cmap, np.percentile(completeness,percentile[0]), np.percentile(completeness,percentile[1])).get_rgb(completeness)
+        cols = GradientColor2D(cmap,0.0001*diag,0.03*diag).get_rgb(completeness)
         # cols=MplColorHelper(cmap, completeness.min(), completeness.max()).get_rgb(completeness)
         pcdc.colors = o3d.utility.Vector3dVector(cols[:,:3])
 
@@ -290,9 +299,7 @@ class MeshEvaluator:
 
         # Accuracy: how far are the points of the predicted pointcloud
         # from the target pointcloud
-        accuracy, accuracy_normals = self.distance_p2p(
-            pointcloud, normals, pointcloud_tgt, normals_tgt
-        )
+        accuracy, accuracy_normals = self.distance_p2p(pointcloud, normals, pointcloud_tgt, normals_tgt)
         # precision = get_threshold_percentage(accuracy, thresholds)
         # accuracy2 = accuracy ** 2
 
@@ -346,7 +353,8 @@ class MeshEvaluator:
         return out_dict
 
 
-    def eval(self, models, method=None, outpath="",
+    def eval(self, models, outpath, method=None,
+             scale_with_diag=True,
              transform=False,
              group_by_class=True, export=False):
 
@@ -384,7 +392,10 @@ class MeshEvaluator:
 
 
                 scale_txt = "(x10^2)"
-                scale = diag/10**2
+                if scale_with_diag:
+                    scale = diag/10**2
+                else:
+                    scale = 1/10**2
 
                 md = {}
                 md["class"] = model["class"]
@@ -407,10 +418,12 @@ class MeshEvaluator:
 
                 if "surface_simplified" in model["output"]:
                     if os.path.isfile(model["output"]["surface_simplified"].format(str(method))):
-                        mesh = trimesh.load(model["output"]["surface_simplified"].format(str(method)), process=False)
+                        # mesh = trimesh.load(model["output"]["surface_simplified"].format(str(method)), process=False, force="mesh")
+                        mesh = vedo.load(model["output"]["surface_simplified"].format(str(method)))
                         self.logger.debug("Loading simplified surface for comlexity evaluation")
-                        md["surf_simpl_triangles"] = mesh.faces.shape[0]
-                        md["surf_simpl_polygons"] = len(mesh.facets)
+                        md["surf_simpl_polygons"] = len(mesh.faces())
+                        # md["surf_simpl_triangles"] = mesh.faces.shape[0]
+                        # md["surf_simpl_polygons"] = len(mesh.facets)
 
 
                 md["in_cells"] = np.nan
@@ -418,7 +431,10 @@ class MeshEvaluator:
                     if os.path.isfile(model["planes"].format(str(method))):
                         md["n_planes"] = np.load(model["planes"].format(str(method)))["group_parameters"].shape[0]
 
-                if os.path.isfile(model["output"]["in_cells"].format(str(method))):
+                if "n_planes" in md.keys() and "surf_simpl_polygons" in md.keys():
+                    md["plane_polygon_ratio"] = md["n_planes"]/md["surf_simpl_polygons"]
+
+                if "in_cells" in model["output"].keys() and os.path.isfile(model["output"]["in_cells"].format(str(method))):
                     self.get_number_of_in_cells(model,md,method)
 
                 self.eval_dicts.append(md)
@@ -434,7 +450,8 @@ class MeshEvaluator:
 
 
             except Exception as e:
-                raise e
+                print(e)
+                # raise e
                 self.logger.error("{}".format(e))
                 self.logger.error("Skipping {}/{}".format(model["class"], model["model"]))
 

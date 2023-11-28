@@ -1,10 +1,5 @@
-import os, sys, subprocess, trimesh
-from libmesh import check_mesh_contains
-from tqdm import tqdm
-import numpy as np
-from glob import glob
-from pathlib import Path
-from .default_dataset import DefaultDataset
+import os
+from default_dataset import DefaultDataset
 import open3d as o3d
 
 
@@ -17,7 +12,7 @@ class RobustDataset(DefaultDataset):
         self.model_dicts = []
 
 
-    def get_models(self, id=None, reduce=None, params=""):
+    def get_models(self, names=None, reduce=None, params=""):
 
         model_dicts = []
         for i in range(100):
@@ -31,7 +26,8 @@ class RobustDataset(DefaultDataset):
             d["eval"] = dict()
             d["eval"]["pointcloud"] = os.path.join(self.path, "eval", str(i), "pointcloud.npz")
             d["eval"]["occ"] = os.path.join(self.path, "eval", str(i), "points.npz")
-            d["pointcloud"] = os.path.join(self.path, "pointcloud", "{}.ply".format(i))
+            d["pointcloud_ply"] = os.path.join(self.path, "pointcloud", "{}.ply".format(i))
+            d["pointcloud"] = os.path.join(self.path, "pointcloud", "{}.npz".format(i))
 
             d["planes"] = os.path.join(self.path,"output","{"+params+"}","{}","planes","{}.npz".format(i))
             d["planes_ply"] = os.path.join(self.path,"output","{"+params+"}","{}","planes","{}.ply".format(i))
@@ -46,15 +42,13 @@ class RobustDataset(DefaultDataset):
 
             model_dicts.append(d)
 
-        if id is not None:
+        temp = []
+        if names is not None:
             for model in model_dicts:
-                if str(id) == model["model"]:
-                    return [model]
-                else:
-                    continue
-                print("Model {} not found".format(id))
-                return []
+                if str(names) == model["model"]:
+                    temp.append(model)
 
+        model_dicts = temp
         if reduce is not None:
             model_dicts = model_dicts[:reduce]
 
@@ -66,3 +60,11 @@ class RobustDataset(DefaultDataset):
         for m in self.model_dicts:
             mesh = o3d.io.read_triangle_mesh(m["mesh"])
             o3d.io.write_triangle_mesh(m["mesh"][:-4] + ".obj", mesh)
+
+
+if __name__ == '__main__':
+
+    ds = RobustDataset()
+    ds.get_models(names=7)
+
+    ds.sample(n_points=4000000)

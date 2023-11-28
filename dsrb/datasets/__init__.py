@@ -8,3 +8,5 @@ from .scalability import ScalabilityDataset
 from .berger import Berger
 from .robust import RobustDataset
 from .thingi10k import Thingi10kDataset
+from .tanksandtemples import TanksAndTemples
+from .defects import DefectsDataset

@@ -68,17 +68,17 @@ class ScalabilityDataset(DefaultDataset):
 
                 # d["planes_vg"] = glob(os.path.join(self.path,"planes",m,"{}_{}".format(m,s),'*.vg'))[0]
 
-                d["planes"] = os.path.join(self.path,"planes",s,m+".npz")
-                d["planes_ply"] = os.path.join(self.path,"planes",s,m+".ply")
-                d["plane_params"] = os.path.join(self.path,"planes",s,m+".json")
+                d["planes"] = os.path.join(self.path,"planes",m, s, m+".npz")
+                d["planes_ply"] = os.path.join(self.path,"planes",m, s, m+".ply")
+                d["plane_params"] = os.path.join(self.path,"planes",m, s, m+".json")
 
                 d["output"] = {}
-                d["output"]["surface"] = os.path.join(self.path, s, m, "{}", "surface.ply")
-                d["output"]["surface_simplified"] = os.path.join(self.path, s, m, "{}", "surface_simplified.obj")
-                d["output"]["partition"] = os.path.join(self.path, s, m, "{}", "partition.ply")
-                d["output"]["partition_pickle"] = os.path.join(self.path, s, m, "{}", "partition")
-                d["output"]["in_cells"] = os.path.join(self.path, s, m, "{}", "in_cells.ply")
-                d["output"]["settings"] = os.path.join(self.path, s, m, "{}", "settings.yaml")
+                d["output"]["surface"] = os.path.join(self.path, "{}", m, s,  "surface.ply")
+                d["output"]["surface_simplified"] = os.path.join(self.path, "{}", m, s,  "surface_simplified.obj")
+                d["output"]["partition"] = os.path.join(self.path, "{}", m, s,  "partition.ply")
+                d["output"]["partition_pickle"] = os.path.join(self.path, "{}", m, s, "partition")
+                d["output"]["in_cells"] = os.path.join(self.path, "{}", m, s, "in_cells.obj")
+                d["output"]["settings"] = os.path.join(self.path, "{}", m, s,  "settings.yaml")
 
                 self.model_dicts.append(d)
 
@@ -424,6 +424,35 @@ class ScalabilityDataset(DefaultDataset):
 
         print(df)
 
+    def move_compod_reconstructions(self):
+
+        path = "/home/rsulzer/data/scalability_test/coacd"
+
+        scales = os.listdir(path)
+
+        for s in scales:
+
+            models = os.listdir(os.path.join(path,s))
+
+            for m in models:
+
+                try:
+                    infile = os.path.join(path,s,m,"in_cells.ply")
+                    outfile = os.path.join("/home/rsulzer/data/scalability_test/coacd_c",m,s,"in_cells.ply")
+                    os.makedirs(os.path.join("/home/rsulzer/data/scalability_test/coacd_c",m,s),exist_ok=True)
+                    os.rename(infile,outfile)
+                except:
+                    pass
+
+
+
+
+
+
+
+
+
+
 
 def make_coacd_comparison_dataset():
 
@@ -565,12 +594,16 @@ def make_coacd_comparison_dataset():
 
 
 
+
+
+
 if __name__ == '__main__':
 
 
-    # ds = ScalabilityDataset()
-    # ds.get_models(scales="40",names='castle')
+    ds = ScalabilityDataset()
+
+    ds.get_models(scales="40",names='castle')
     #
     # ds.sample(2000000)
 
-    make_coacd_comparison_dataset()
+    # make_coacd_comparison_dataset()

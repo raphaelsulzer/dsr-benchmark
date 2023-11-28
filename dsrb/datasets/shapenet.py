@@ -1,5 +1,5 @@
 import os, sys, subprocess
-import shutil
+import numpy as np
 
 sys.path.append(os.path.join(os.path.dirname(__file__)))
 from scan_settings import scan_settings
@@ -57,22 +57,61 @@ class ShapeNet(DefaultDataset):
             self.classes = temp
 
 
+    # def setup(self):
+    #
+    #     for c in self.classes:
+    #
+    #         models = os.listdir(os.path.join(self.path,c))
+    #
+    #         for m in models:
+    #             # try:
+    #
+    #             infile = os.path.join(self.path,c,m,"mesh.off")
+    #             if not os.path.isfile(infile):
+    #                 continue
+    #             os.makedirs(os.path.join(self.path,c,m,"mesh"),exist_ok=True)
+    #             outfile = os.path.join(self.path,c,m,"mesh","mesh.off")
+    #             os.rename(infile,outfile)
+
+
     def setup(self):
 
-        splits = self.get_models()
+        """Move models from classX/4_watertight_scaled/modelX.off to classX/modelX/mesh/mesh.off"""
 
-        for splits,models in splits.items():
-            for m in models:
+        for split in self.model_dicts.keys():
+
+            for model in tqdm(self.model_dicts[split]):
+
+                print("Process model {}/{}".format(model["class"], model["model"]))
+
                 try:
-                    os.makedirs(os.path.join(m["path"],"eval"),exist_ok=True)
-                    os.rename(os.path.join(m["path"],"pointcloud.npz"),m["pointcloud"])
-                    os.rename(os.path.join(m["path"],"points.npz"),m["occ"])
 
-                    os.makedirs(os.path.join(m["path"],"mesh"),exist_ok=True)
-                    os.rename(os.path.join(self.path,m["class"],"4_watertight_scaled",m["model"]+".off"),m["mesh"])
+                    infile = os.path.join(self.path,model["class"],"4_watertight_scaled","{}.off".format(model["model"]))
+                    if not os.path.isfile(infile):
+                        continue
+                    outfile = os.path.join(self.path,model["class"],model["model"],"mesh","mesh.off")
+                    if not os.path.isdir(self.path,model["class"],model["model"]):
+                        continue
+                    os.makedirs(os.path.join(self.path,model["class"],model["model"],"mesh"))
+                    os.rename(infile,outfile)
                 except Exception as e:
+                    raise e
+                    print("Problem with model {}/{}".format(model["class"],model["model"]))
                     print(e)
-                    print("Skipping {}/{}".format(m["class"], m["model"]))
+
+
+    def setup_bspnet_split(self):
+
+        path = "/home/rsulzer/python/BSP-NET-pytorch/samples/"
+
+        classes = os.listdir(path)
+        for cl in classes:
+
+            models = os.listdir(os.path.join(path,cl))
+
+            np.savetxt(os.path.join("/home/rsulzer/data/ShapeNet",cl,"bspnet.lst"),models,fmt="%s")
+
+
 
     def get_models(self,splits=["train","val","test"],scan_conf="4",reduce=None,names=None):
         
@@ -208,19 +247,12 @@ class ShapeNet(DefaultDataset):
 
 if __name__ == '__main__':
 
-    id = "d1f68ceddaa3b0bcfebad4f49b26ec52"
 
-    ds = ShapeNet(
-        classes=['04256520', '03636649', '04401088', '04530566', '03691459', '03001627', '04379243', '03211117',
-                 '04090263'])
-    split = "bspnet"
-    ds.get_models(splits=[split], names=id)
+    ds = ShapeNet()
 
-    ds.make_eval()
-    # ds.setup()
-    # ds.get_models(reduce=0.01)
-    # ds.standardize()
-    # ds.sample(n_points=100000)
+    ds.get_models(names=["a6d282a360621055614d73f24792753f"])
+
+    ds.setup()
 
 
 

@@ -32,39 +32,6 @@ class KSR42Dataset_ori(DefaultDataset):
 
     def setup(self):
 
-        ## make model.lst
-        # for c in self.classes:
-        #
-        #     cpath = os.path.join(self.path,c)
-        #     models = os.listdir(cpath)
-        #     np.savetxt(os.path.join(cpath,'models.lst'), models, fmt="%s")
-
-        # ## rename input point cloud
-        # for model in self.model_dicts:
-        #
-        #     files = glob(model["path"]+"/*.vg")
-        #
-        #     if not len(files) == 1:
-        #         print(model["path"])
-        #         continue
-        #     else:
-        #         # pcd=o3d.io.read_point_cloud(files[0])
-        #         #
-        #         # os.makedirs(os.path.join(model["path"],"pointcloud"))
-        #         #
-        #         # if not pcd.has_normals():
-        #         #     o3d.geometry.estimate_normals(pcd)
-        #         #
-        #         # o3d.io.write_point_cloud(os.path.join(model["path"],"pointcloud","pointcloud.ply"),pcd)
-        #         #
-        #         # points = np.asarray(pcd.points)
-        #         # normals = np.asarray(pcd.normals)
-        #         #
-        #         # np.savez(os.path.join(model["path"],"pointcloud","pointcloud.npz"),points=points,normals=normals)
-        #
-        #         os.makedirs(os.path.join(model["path"],"planes"))
-        #         shutil.copyfile(files[0], os.path.join(os.path.join(model["path"],"planes","planes.vg")))
-
         ## setup plane param file
         for model in self.model_dicts:
 
@@ -129,6 +96,7 @@ class KSR42Dataset_ori(DefaultDataset):
 
                 d["pointcloud"] = os.path.join(self.path,c,m,"pointcloud","pointcloud.npz")
                 d["pointcloud_ply"] = os.path.join(self.path,c,m,"pointcloud","pointcloud.ply")
+                d["pointcloud_lidar"] = os.path.join(self.path,c,m,"pointcloud","pointcloud_voxel_001.ply")
                 pcd = o3d.io.read_point_cloud(d["pointcloud_ply"])
                 d["bb_diagonal"] = np.linalg.norm(pcd.get_min_bound() - pcd.get_max_bound())
 
@@ -149,7 +117,7 @@ class KSR42Dataset_ori(DefaultDataset):
                 d["output"]["surface_simplified"] = os.path.join(self.path,c, m, "{}", "surface_simplified.obj")
                 d["output"]["partition"] = os.path.join(self.path,c, m, "{}", "partition.ply")
                 d["output"]["partition_pickle"] = os.path.join(self.path,c, m, "{}", "partition")
-                d["output"]["in_cells"] = os.path.join(self.path,c, m, "{}", "in_cells.ply")
+                d["output"]["in_cells"] = os.path.join(self.path,c, m, "{}", "in_cells.obj")
                 d["output"]["settings"] = os.path.join(self.path,c, m, "{}", "settings.yaml")
 
                 self.model_dicts.append(d)
@@ -236,8 +204,8 @@ class KSR42Dataset_ori(DefaultDataset):
             td = {"class":m["class"],"model":m["model"]}
             os.makedirs(os.path.dirname(m["mesh"]),exist_ok=True)
             command = [self.poisson_exe,
-                       "--in", m["pointcloud_ply"],
-                       "--out", m["mesh"][:-4],
+                       "--in", m["pointcloud_lidar"],
+                       "--out", m["mesh"][:-4]+"_{}".format(depth),
                        "--depth", str(depth),
                        "--bType", str(boundary)]
             print("run command: ", *command)
@@ -346,10 +314,6 @@ class KSR42Dataset_ori(DefaultDataset):
                 # os.remove(os.path.join(self.path,model["class"],model["model"],"partition"))
 
 
-            a=5
-
-
-
     def make_eval(self,n_points=100000,unit=False,surface=True,occ=True):
 
         print("Sample points on surface and in bounding box for evaluation...\n")
@@ -360,22 +324,13 @@ class KSR42Dataset_ori(DefaultDataset):
             sys.exit(1)
 
 
-
-
-
         for m in tqdm(self.model_dicts):
 
             try:
-
-                # if not unit:
-                #     m["mesh"] = m["ori_mesh"]
-
                 mesh = trimesh.load(m["mesh"])
                 fpath = os.path.dirname(m["eval"]["pointcloud"])
                 os.makedirs(fpath, exist_ok=True)
-
                 if surface:
-
                     # surface points
                     points_surface, fid = mesh.sample(n_points,return_index=True)
                     normals = mesh.face_normals[fid]
@@ -388,7 +343,6 @@ class KSR42Dataset_ori(DefaultDataset):
                         pcd.points = o3d.utility.Vector3dVector(points_surface)
                         pcd.normals = o3d.utility.Vector3dVector(normals)
                         o3d.io.write_point_cloud(str(Path(m["eval"]["pointcloud"]).with_suffix(".ply")), pcd)
-
 
                 # IoU points
                 if occ:
@@ -469,10 +423,10 @@ if __name__ == '__main__':
     ds = KSR42Dataset_ori()
     ds.get_models(names="Meeting_room")
     # ds.estim_normals()
-    ds.make_poisson(depth=12)
-    ds.mesh_to_points()
-
-    # ds.setup()
-
-    ds.detect_planes({"min_inliers": 20, "epsilon": 0.001, "normal_th": 0.88},max_seconds=3600)
+    ds.make_poisson(depth=10)
+    # ds.mesh_to_points()
+    #
+    # # ds.setup()
+    #
+    # ds.detect_planes({"min_inliers": 20, "epsilon": 0.001, "normal_th": 0.88},max_seconds=3600)
     # ds.detect_planes({"min_inliers": 30, "epsilon": 0.003, "normal_th": 0.85},max_seconds=21600)

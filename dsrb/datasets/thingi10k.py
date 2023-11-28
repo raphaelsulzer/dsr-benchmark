@@ -9,8 +9,6 @@ from datetime import datetime
 
 class Thingi10kDataset(DefaultDataset):
 
-
-
     def __init__(self):
         super().__init__()
         self.path = os.path.join(self.path, "thingi10k")

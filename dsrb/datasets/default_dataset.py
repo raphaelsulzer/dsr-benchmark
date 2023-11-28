@@ -15,11 +15,9 @@ import matplotlib.colors as mcolors
 from copy import deepcopy
 
 
-
-
 class DefaultDataset:
 
-    def __init__(self,classes = None,
+    def __init__(self,
                  mesh_tools_dir="/home/rsulzer/cpp/mesh-tools/build/release",
                  poisson_exe = "/home/rsulzer/cpp/PoissonRecon/Bin/Linux/PoissonRecon",
                  tqdm_enabled=True,
@@ -33,21 +31,11 @@ class DefaultDataset:
             data_dir = f.readline()
 
         self.path = data_dir
-
         self.model_dicts = []
         self.mesh_tools_dir = mesh_tools_dir
         self.poisson_exe = poisson_exe
-
         self.debug_export = debug_export
-
         self.tqdm_disabled = not tqdm_enabled
-
-        # if classes is None:
-        #     with open(os.path.join(self.path, "classes.lst"), 'r') as f:
-        #         cl = f.read().split('\n')
-        #     if '' in cl:
-        #         cl.remove('')
-        #     self.classes = cl
 
 
     def scan(self,scan_setting="4",scanner_dir="/home/raphael/cpp/mesh-tools/build/release/scan",
@@ -155,18 +143,44 @@ class DefaultDataset:
                 print(m["model"])
                 # raise
 
-    def make_poisson(self, depth=8, boundary=2):
+    def make_poisson(self, depth=8, boundary=2, trim=None, keep_largest_component_only=False):
+
         for m in tqdm(self.model_dicts, ncols=50):
-            # try:
-            command = [self.POISSON_EXE,
-                       "--in", m["scan_ply"],
-                       "--out", os.path.join(self.path, m["class"], m["mesh"][:-3]+"ply"),
-                       "--depth", str(depth),
-                       "--bType", str(boundary)]
-            print("run command: ", *command)
-            p = subprocess.Popen(command)
-            # p = subprocess.Popen(command, shell=False,stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-            p.wait()
+            try:
+
+                os.makedirs(os.path.dirname(m["mesh"]),exist_ok=True)
+                command = [self.poisson_exe,
+                           "--in", m["pointcloud_ply"],
+                           "--out", m["mesh"][:-4]+".ply",
+                           "--depth", str(depth),
+                           "--density",
+                           "--bType", str(boundary)]
+                print("run command: ", *command)
+                p = subprocess.Popen(command)
+                # p = subprocess.Popen(command, shell=False,stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+                p.wait()
+
+
+                if trim is not None:
+                    command = [self.poisson_exe.replace("Linux/PoissonRecon","Linux/SurfaceTrimmer"),
+                               "--in", m["mesh"][:-4]+".ply",
+                               "--out", m["mesh"][:-4]+".ply",
+                               "--trim", str(trim)]
+                    print("run command: ", *command)
+                    p = subprocess.Popen(command)
+                    p.wait()
+
+
+                if keep_largest_component_only:
+                    self.keep_largest_components_only(m["mesh"][:-4]+".ply")
+
+                mesh = o3d.io.read_triangle_mesh(m["mesh"][:-4]+".ply")
+                o3d.io.write_triangle_mesh(m["mesh"],mesh)
+                os.remove(m["mesh"][:-4]+".ply")
+
+            except Exception as e:
+                print(e)
+
 
 
     def standardize(self,padding=0.1):
@@ -307,8 +321,6 @@ class DefaultDataset:
 
                     colors = np.zeros(shape=(n_points, 3)) + [0, 0, 1]
                     colors[occupancies] = [1,0,0]
-
-
 
                     dtype = np.float16
                     points = points.astype(dtype)
@@ -460,3 +472,20 @@ class DefaultDataset:
             with open(model["plane_params"], "w") as outfile:
                 # json_data refers to the above JSON
                 json.dump(params, outfile)
+
+
+    def ply2npz(self):
+
+        for model in self.model_dicts:
+
+            pc = o3d.io.read_point_cloud(model["pointcloud_ply"])
+            np.savez_compressed(model["pointcloud"],points=np.asarray(pc.points),normals=np.asarray(pc.normals))
+
+
+    def keep_largest_components_only(self,infile):
+
+        import vedo.io
+
+        mesh = vedo.io.load(infile)
+        mesh = mesh.extract_largest_region()
+        vedo.io.write(mesh,infile)
