@@ -5,7 +5,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-datasets/DATASETDIR.txt
+
 
 .idea
 

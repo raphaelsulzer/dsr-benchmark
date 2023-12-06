@@ -1,9 +1,6 @@
-import logging
+import logging, trimesh, vedo, os
 import numpy as np
-import trimesh
-import sys, os
 
-import vedo
 from scipy.spatial import cKDTree
 from libmesh import check_mesh_contains
 import pandas as pd

@@ -60,4 +60,4 @@ pip install open3d
 pip install torch --index-url https://download.pytorch.org/whl/cu118
 pip install networkx[default]
 python setup_libmesh_convonet.py build_ext --inplace
-pip install .
+pip install --no-build-isolation .

@@ -46,11 +46,16 @@ echo "PATH/TO/MESHTOOLS_DIR" >> CPP_DIR.txt
 ```
 
 3) Clone and install [mesh-tools](https://github.com/raphaelsulzer/mesh-tools) to your `CPP_DIR`.
-4) 
+4) You can test if everything is installed correctly by running.
 
-4) Download and unzip the three datasets above (Berger, ModelNet, ShapeNet) to your `DATASET_DIR`.
+```bash
+python test/test_benchmark.py
+```
 
-5) Setup the datasets, apply your reconstruction algorithm and evaluate your reconstructions.
+
+5) Download and unzip the three datasets above (Berger, ModelNet, ShapeNet) to your `DATASET_DIR`.
+
+6) Setup the datasets, apply your reconstruction algorithm and evaluate your reconstructions.
 
 ```python
 from dsrb.datasets import Berger, ModelNet10, ShapeNet
