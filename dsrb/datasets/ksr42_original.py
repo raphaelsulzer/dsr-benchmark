@@ -1,18 +1,15 @@
 import os, sys, subprocess, trimesh, shutil, json, time
 from datetime import datetime
-
 import pandas as pd
-from scan_settings import scan_settings
-from libmesh import check_mesh_contains
 from tqdm import tqdm
 import numpy as np
 from glob import glob
 from pathlib import Path
-from default_dataset import DefaultDataset
 import open3d as o3d
 
-DEBUG = 1
-
+from dsrb import DefaultDataset
+from dsrb.scan_settings import scan_settings
+from libmesh import check_mesh_contains
 
 
 class KSR42Dataset_ori(DefaultDataset):

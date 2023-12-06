@@ -1,16 +1,12 @@
 import os, sys, subprocess, trimesh
-from scan_settings import scan_settings
-from libmesh import check_mesh_contains
 from tqdm import tqdm
 import numpy as np
-from glob import glob
 from pathlib import Path
-from default_dataset import DefaultDataset
 import open3d as o3d
 
-DEBUG = 1
-
-
+from libmesh import check_mesh_contains
+from dsrb import DefaultDataset
+from dsrb.scan_settings import scan_settings
 
 class KSR42Dataset(DefaultDataset):
 

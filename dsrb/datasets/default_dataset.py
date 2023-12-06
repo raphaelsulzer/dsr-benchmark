@@ -1,17 +1,20 @@
-import os, sys, subprocess, trimesh
+import os, sys, subprocess, trimesh, logging
 try:
     import vedo
 except:
     pass
-from libmesh import check_mesh_contains
 from tqdm import tqdm
 import numpy as np
 import open3d as o3d
 from pathlib import Path
 import matplotlib.colors as mcolors
 from copy import deepcopy
-import logging
-from dsrb.datasets.scan_settings import scan_settings
+
+from libmesh import check_mesh_contains
+from dsrb.scan_settings import scan_settings
+from dsrb.logger import make_dsrb_logger
+
+
 
 class DefaultDataset:
 
@@ -24,19 +27,20 @@ class DefaultDataset:
         if logger is not None:
             self.logger = logger
         else:
-            self.logger = logging.getLogger("DATASET")
-            self.logger.setLevel(verbosity)
+            self.logger = make_dsrb_logger("DATASET",level=verbosity)
 
-        data_dir_file = os.path.join(os.path.dirname(__file__),"..","..","DATA_DIR.txt")
+        # data_dir_file = os.path.join(os.path.dirname(__file__),"..","..","CPP_DIR.txt")
+        data_dir_file = "./DATA_DIR.txt"
         if not os.path.isfile(data_dir_file):
-            self.logger.error("Could not find {}. Please put a file called DATA_DIR.txt with the path that points to your dataset directory in the root folder of this porject.".format(data_dir_file))
+            self.logger.error("Could not find {}. Please put a file called DATA_DIR.txt with the path that points to your dataset directory in the root folder of this project.".format(data_dir_file))
             return 1
         with open(data_dir_file,"r") as f:
             data_dir = f.readline()
 
-        cpp_dir_file = os.path.join(os.path.dirname(__file__),"..","..","CPP_DIR.txt")
+        # cpp_dir_file = os.path.join(os.path.dirname(__file__),"..","..","CPP_DIR.txt")
+        cpp_dir_file = "./CPP_DIR.txt"
         if not os.path.isfile(cpp_dir_file):
-            self.logger.error("Could not find {}. Please put a file called CPP_DIR.txt in the root folder of this porject which points to your cpp directory.".format(cpp_dir_file))
+            self.logger.error("Could not find {}. Please put a file called CPP_DIR.txt with the path that points to your cpp directory in the root folder of this project.".format(cpp_dir_file))
         else:
             with open(cpp_dir_file,"r") as f:
                 cpp_dir = f.readline()
@@ -58,7 +62,7 @@ class DefaultDataset:
 
         scan_exe = os.path.join(self.mesh_tools_dir,"scan")
         if not os.path.isfile(scan_exe):
-            self.logger.error("Could not find {}. Please install mesh-tools from here: https://github.com/raphaelsulzer/mesh-tools.git")
+            self.logger.error("Could not find {}. Please install mesh-tools from here: https://github.com/raphaelsulzer/mesh-tools.git".format(scan_exe))
             return 1
 
 
@@ -77,7 +81,7 @@ class DefaultDataset:
 
         for s in self.splits:
             models = self.model_dicts[s]
-            for model in tqdm(models,ncols=50):
+            for model in tqdm(models, ncols=50, file=sys.stdout):
 
                 try:
                     os.makedirs(os.path.dirname(model["scan"]),exist_ok=True)
@@ -110,7 +114,7 @@ class DefaultDataset:
 
     def sample(self,n_points=1000000,overwrite=True):
 
-        for m in tqdm(self.model_dicts, disable=self.tqdm_disabled):
+        for m in tqdm(self.model_dicts, disable=self.tqdm_disabled, file=sys.stdout):
 
             if os.path.isfile(m["pointcloud_ply"]) and not overwrite:
                 continue
@@ -138,7 +142,7 @@ class DefaultDataset:
     def make_pointcloud_ply(self,n_points=100000,std_noise=0.0):
         print("Writing pointclouds for reconstruction input...\n")
 
-        for m in tqdm(self.model_dicts):
+        for m in tqdm(self.model_dicts, file=sys.stdout):
 
             data = np.load(m["pointcloud"])
 
@@ -156,7 +160,7 @@ class DefaultDataset:
             print("\nERROR: run get_models() first!")
             sys.exit(1)
 
-        for m in tqdm(self.model_dicts, disable=self.tqdm_disabled):
+        for m in tqdm(self.model_dicts, disable=self.tqdm_disabled, file=sys.stdout):
             try:
                 command = [str(os.path.join(self.mesh_tools_dir, "normal")),
                            # "-w", str(self.path),
@@ -175,7 +179,7 @@ class DefaultDataset:
                 print("Skipping {}/{}".format(m["class"], m["model"]))
 
     def clean(self):
-        for m in tqdm(self.model_dicts, ncols=50):
+        for m in tqdm(self.model_dicts, ncols=50, file=sys.stdout):
             try:
                 os.remove(str(Path(m["mesh"]).with_suffix(".ply")))
             except:
@@ -184,7 +188,7 @@ class DefaultDataset:
 
     def make_poisson(self, depth=8, boundary=2, trim=None, keep_largest_component_only=False):
 
-        for m in tqdm(self.model_dicts, ncols=50):
+        for m in tqdm(self.model_dicts, ncols=50, file=sys.stdout):
             try:
 
                 os.makedirs(os.path.dirname(m["mesh"]),exist_ok=True)
@@ -227,7 +231,7 @@ class DefaultDataset:
         Standardize mesh so that maximum bounding box side length is 1.
         :return:
         """
-        for m in tqdm(self.model_dicts,disable=self.tqdm_disabled):
+        for m in tqdm(self.model_dicts,disable=self.tqdm_disabled, file=sys.stdout):
 
             if os.path.isfile(os.path.splitext(m["mesh"])[0]+"_unit.off"):
                continue
@@ -256,7 +260,7 @@ class DefaultDataset:
         :return:
         """
 
-        for m in tqdm(self.model_dicts,disable=self.tqdm_disabled):
+        for m in tqdm(self.model_dicts,disable=self.tqdm_disabled, file=sys.stdout):
 
             mesh = o3d.io.read_triangle_mesh(m["mesh"])
 
@@ -279,7 +283,7 @@ class DefaultDataset:
         if(len(self.model_dicts) < 1):
             self.logger.error("run get_models() first!")
             return 1
-        for m in tqdm(self.model_dicts):
+        for m in tqdm(self.model_dicts, file=sys.stdout):
 
             try:
 
@@ -392,7 +396,7 @@ class DefaultDataset:
             else:
                 print("Don't know that color type")
 
-        for model in tqdm(self.model_dicts, disable=self.tqdm_disabled):
+        for model in tqdm(self.model_dicts, disable=self.tqdm_disabled, file=sys.stdout):
 
             infile = model[method]["in_cells"]
 
@@ -434,7 +438,7 @@ class DefaultDataset:
         rgb_colors = np.array(rgb_colors)
 
         pe = PlaneExporter()
-        for model in tqdm(self.model_dicts):
+        for model in tqdm(self.model_dicts, file=sys.stdout):
 
             if not os.path.isfile(model["planes"]):
                 print("{} not found".format(model["planes"]))

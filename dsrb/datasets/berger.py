@@ -1,17 +1,13 @@
-import os, sys, subprocess, pathlib
-sys.path.append(os.path.join(os.path.dirname(__file__)))
-from scan_settings import scan_settings
+import os, sys, subprocess, trimesh
 import numpy as np
 from tqdm import tqdm
-import trimesh
 import open3d as o3d
-from libmesh import check_mesh_contains
 from pathlib import Path
-from .default_dataset import DefaultDataset
+
+from libmesh import check_mesh_contains
+from dsrb import DefaultDataset
 
 
-
-DEBUG = 1
 class Berger(DefaultDataset):
 
     def __init__(self,path=None,classes=[]):

@@ -35,27 +35,17 @@ cd dsr-benchmark
 bash install.sh   # creates a conda environment named dsr including all necessary python dependencies
 conda activate dsr
 ```
-2) Create two files in the root directory of the repository.
-`DATA_DIR.txt` points to the directory where the datasets and results are stored
-and `CPP_DIR.txt` to the directory of [mesh-tools](https://github.com/raphaelsulzer/mesh-tools) used to generate
-input point clouds via synthetic scanning.
+2) Clone and install [mesh-tools](https://github.com/raphaelsulzer/mesh-tools) to your `CPP_DIR`.
+
+3) Download and unzip the three datasets above (Berger, ModelNet, ShapeNet) to your `DATASET_DIR`.
+
+4) Test if everything is installed correctly by running.
 
 ```bash
-echo "PATH/TO/DATASET_DIR" >> DATA_DIR.txt
-echo "PATH/TO/MESHTOOLS_DIR" >> CPP_DIR.txt
+python test/test_benchmark.py --cpp_dir CPP_DIR --dataset_dir DATASET_DIR
 ```
 
-3) Clone and install [mesh-tools](https://github.com/raphaelsulzer/mesh-tools) to your `CPP_DIR`.
-4) You can test if everything is installed correctly by running.
-
-```bash
-python test/test_benchmark.py
-```
-
-
-5) Download and unzip the three datasets above (Berger, ModelNet, ShapeNet) to your `DATASET_DIR`.
-
-6) Setup the datasets, apply your reconstruction algorithm and evaluate your reconstructions.
+5) Apply your reconstruction algorithm and evaluate your reconstructions.
 
 ```python
 from dsrb.datasets import Berger, ModelNet10, ShapeNet
@@ -63,7 +53,9 @@ from dsrb.eval import MeshEvaluator
 
 me = MeshEvaluator()
 
+####################################################
 ### Berger et al. dataset (Experiments 4, 6 & 7) ###
+####################################################
 dataset = Berger()
 # get the MVS scans used in Experiment 4 (learning-based)
 models = dataset.get_models(scan_configuration="mvs")
@@ -81,7 +73,9 @@ for model in models:
 # evaluate your reconstructions 
 me.eval(models,outpath=dataset.path,method="NAME_OF_YOUR_ALGORITHM")
 
+###############################################
 ### ModelNet10 dataset (Experiments 3 & 5 ) ###
+###############################################
 dataset = ModelNet10()
 models = dataset.get_models()
 models_train = models["train"]
@@ -95,7 +89,9 @@ for model in models["test"]:
 # evaluate your reconstructions
 me.eval(models,outpath=dataset.path,method="NAME_OF_YOUR_ALGORITHM")
 
+############################################
 ### ShapeNet dataset (Experiments 1 - 5) ###
+############################################
 dataset = ShapeNet()
 dataset.setup()
 # the scanned point clouds for ShapeNet are not included in the downloaded dataset

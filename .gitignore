@@ -5,7 +5,20 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+dsrb/CPP_DIR.txt
+dsrb/DATA_DIR.txt
 
+CPP_DIR.txt
+DATA_DIR.txt
+
+*/CPP_DIR.txt
+*/DATA_DIR.txt
+
+test/reconbench/eval
+test/reconbench/poisson
+test/reconbench/scan
+test/reconbench/scan_ply
+test/reconbench/poisson_full.csv
 
 .idea
 

@@ -1,19 +1,15 @@
-import os, sys, subprocess, pathlib
-import shutil
+import os, sys, subprocess, shutil, trimesh
 
 import pandas as pd
-from scan_settings import scan_settings
 import numpy as np
 from tqdm import tqdm
-import trimesh
 import open3d as o3d
-from libmesh import check_mesh_contains
 from pathlib import Path
 from glob import glob
-from default_dataset import DefaultDataset
 from copy import deepcopy
-from collections import defaultdict
-# from fancycolor import Recolor
+
+from libmesh import check_mesh_contains
+from dsrb import DefaultDataset, scan_settings
 
 DEBUG = 1
 class ScalabilityDataset(DefaultDataset):

@@ -1,5 +1,6 @@
 import numpy as np
-from .triangle_hash import TriangleHash as _TriangleHash
+from libmesh import _TriangleHash
+# from triangle_hash import TriangleHash as _TriangleHash
 
 ## build libmesh by going into the utils directory and running (with conda env activated):
 ## python setup_libmesh_convonet.py build_ext --inplace

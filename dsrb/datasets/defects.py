@@ -1,15 +1,9 @@
-import os
+import os, trimesh
 import numpy as np
 from copy import deepcopy
-
-import trimesh
-
-from default_dataset import DefaultDataset
 import open3d as o3d
 
-DEBUG = 1
-
-
+from dsrb import DefaultDataset
 
 class DefectsDataset(DefaultDataset):
 

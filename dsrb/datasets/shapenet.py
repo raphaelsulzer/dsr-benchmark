@@ -1,10 +1,7 @@
 import os, sys, subprocess
 import numpy as np
-
-sys.path.append(os.path.join(os.path.dirname(__file__)))
-from scan_settings import scan_settings
 from tqdm import tqdm
-from default_dataset import DefaultDataset
+from dsrb import DefaultDataset
 
 class ShapeNet(DefaultDataset):
 

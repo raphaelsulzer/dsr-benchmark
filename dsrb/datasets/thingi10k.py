@@ -4,9 +4,10 @@ import time
 import pandas as pd
 import open3d as o3d
 from tqdm import tqdm
-from default_dataset import DefaultDataset
 import numpy as np
 from datetime import datetime
+
+from dsrb import DefaultDataset
 
 class Thingi10kDataset(DefaultDataset):
 

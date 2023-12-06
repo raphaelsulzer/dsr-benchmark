@@ -1,6 +1,5 @@
-import os, sys, subprocess
-from tqdm import tqdm
-from dsrb.datasets import DefaultDataset
+import os
+from dsrb import DefaultDataset
 
 class ModelNet10(DefaultDataset):
 

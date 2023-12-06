@@ -1,12 +1,12 @@
-import logging, trimesh, vedo, os
+import logging, trimesh, vedo, os, sys
 import numpy as np
-
 from scipy.spatial import cKDTree
-from libmesh import check_mesh_contains
 import pandas as pd
 from tqdm import tqdm
 import open3d as o3d
 
+from libmesh import check_mesh_contains
+from dsrb.logger import make_dsrb_logger
 
 class MeshEvaluator:
     ''' Mesh evaluation class.
@@ -17,9 +17,14 @@ class MeshEvaluator:
         n_points (int): number of points to be used for evaluation
     '''
 
-    def __init__(self, n_points=100000, logger=None, export_colored_eval_pointclouds=False, debug_export=False):
+    def __init__(self, n_points=100000, logger=None, verbosity=logging.INFO, export_colored_eval_pointclouds=False, debug_export=False):
         self.n_points = n_points
-        self.logger = logger if logger else logging.getLogger("SURFACE EVALUATOR")
+
+        if logger is not None:
+            self.logger = logger
+        else:
+            self.logger = make_dsrb_logger("MESH_EVALUATOR",level=verbosity)
+
         self.debug_export = debug_export
 
         self.export_colored_eval_pointclouds = export_colored_eval_pointclouds
@@ -339,7 +344,9 @@ class MeshEvaluator:
             self.logger.error("No models to evaluate.")
             return None
 
-        for model in tqdm(models):
+        self.logger.info("Evaluate {} meshes".format(len(models)))
+
+        for model in tqdm(models, ncols=50, file=sys.stdout):
             try:
 
                 if not os.path.isfile(model["output"]["surface"].format(str(method))):

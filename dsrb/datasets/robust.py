@@ -1,7 +1,7 @@
 import os
-from default_dataset import DefaultDataset
 import open3d as o3d
 
+from dsrb import DefaultDataset
 
 class RobustDataset(DefaultDataset):
 

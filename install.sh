@@ -55,9 +55,8 @@ conda activate ${PROJECT_NAME}
 
 # Dependencies
 conda install -y -c conda-forge mamba
-mamba install -y conda-forge::trimesh conda-forge::vedo anaconda::cython
+mamba install -y conda-forge::trimesh conda-forge::vedo anaconda::cython conda-forge::colorlog
 pip install open3d
 pip install torch --index-url https://download.pytorch.org/whl/cu118
-pip install networkx[default]
-python setup_libmesh_convonet.py build_ext --inplace
-pip install --no-build-isolation .
+python setup.py build_ext --inplace
+pip install .
