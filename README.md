@@ -32,7 +32,7 @@ data for ConvONet, Points2Surf, Shape As Points, POCO and DGNN.
 ```bash
 git clone https://github.com/raphaelsulzer/dsr-benchmark.git
 cd dsr-benchmark
-bash install.sh   # creates a conda environment named dsr including all necessary python dependencies
+bash install.sh   # create a conda environment called dsr including all python dependencies
 conda activate dsr
 ```
 2) Clone and install [mesh-tools](https://github.com/raphaelsulzer/mesh-tools) to your `CPP_DIR`.
