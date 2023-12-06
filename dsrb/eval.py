@@ -5,16 +5,10 @@ import sys, os
 
 import vedo
 from scipy.spatial import cKDTree
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from libmesh import check_mesh_contains
 import pandas as pd
 from tqdm import tqdm
-import glob
 import open3d as o3d
-import subprocess
-from plyfile import PlyData
-from fancycolor import GradientColor2D
-
 
 
 class MeshEvaluator:
@@ -26,33 +20,16 @@ class MeshEvaluator:
         n_points (int): number of points to be used for evaluation
     '''
 
-    def __init__(self, n_points=100000, mesh_region_growing=None,logger=None, debug_export=False):
+    def __init__(self, n_points=100000, logger=None, export_colored_eval_pointclouds=False, debug_export=False):
         self.n_points = n_points
-        self.mesh_region_growing = mesh_region_growing
         self.logger = logger if logger else logging.getLogger("SURFACE EVALUATOR")
         self.debug_export = debug_export
+
+        self.export_colored_eval_pointclouds = export_colored_eval_pointclouds
 
         if self.debug_export:
             self.logger.warning('\nDebug export activated! Turn off for faster processing.\n')
 
-        # Maximum values for bounding box [-0.5, 0.5]^3
-        # self.EMPTY_PCL_DICT = {
-        #     'completeness': np.sqrt(3),
-        #     'accuracy': np.sqrt(3),
-        #     'completeness2': 3,
-        #     'accuracy2': 3,
-        #     'chamfer': 6,
-        #     'hausdorff': 1000,
-        #     'watertight': 0,
-        #     'boundary_edges': 0,
-        #     'non-manifold_edges': 0
-        # }
-        #
-        # self.EMPTY_PCL_DICT_NORMALS = {
-        #     'normals completeness': -1.,
-        #     'normals accuracy': -1.,
-        #     'normals': -1.,
-        # }
 
     def distance_p2p(self,points_src, normals_src, points_tgt, normals_tgt):
         ''' Computes minimal distances of each point in points_src to points_tgt.
@@ -180,6 +157,7 @@ class MeshEvaluator:
         out_dict = self.eval_pointcloud(
             pointcloud, pointcloud_tgt, normals, normals_tgt)
 
+
         # components =
         out_dict["components"] = mesh.body_count
 
@@ -225,8 +203,9 @@ class MeshEvaluator:
 
         return out_dict
 
-    # def color_pointcloud(self, pointcloud, pointcloud_tgt,normals,normals_tgt,accuracy,completeness,percentile=(2,98)):
     def color_pointcloud(self, pointcloud, pointcloud_tgt, accuracy, completeness, percentile=(2,98)):
+
+        from fancycolor import GradientColor2D
 
         # TODO: eventually it would probably be good to have the same scale per object, even when reconstruct with different methods
         # one simple way would be to concatenate all accuracies (and completeness respectively) per object and then apply
@@ -261,9 +240,9 @@ class MeshEvaluator:
         return pcda, pcdc
 
 
-    def eval_pointcloud(self, pointcloud, pointcloud_tgt,
-                        normals=None, normals_tgt=None,
-                        thresholds=np.linspace(1. / 1000, 1, 1000),color=True):
+    def eval_pointcloud(self,
+                        pointcloud, pointcloud_tgt,
+                        normals=None, normals_tgt=None):
         ''' Evaluates a point cloud.
 
         Args:
@@ -344,7 +323,7 @@ class MeshEvaluator:
             # 'f-score-20': F[19],  # threshold = 2.0%
         }
 
-        if color:
+        if self.export_colored_eval_pointclouds:
             # out = self.color_pointcloud(pointcloud,pointcloud_tgt,normals,normals_tgt,accuracy,completeness)
             out = self.color_pointcloud(pointcloud,pointcloud_tgt,accuracy,completeness)
             out_dict["accuracy_pointcloud"] = out[0]
@@ -353,10 +332,9 @@ class MeshEvaluator:
         return out_dict
 
 
-    def eval(self, models, outpath, method=None,
+    def eval(self, models, outpath, method,
              scale_with_diag=True,
-             transform=False,
-             group_by_class=True, export=False):
+             group_by_class=True):
 
         self.eval_dicts=[]
 
@@ -439,7 +417,7 @@ class MeshEvaluator:
 
                 self.eval_dicts.append(md)
 
-                if export:
+                if self.export_colored_eval_pointclouds:
                     assert(eval_dict_mesh["accuracy_pointcloud"] is not None and eval_dict_mesh["completeness_pointcloud"] is not None)
 
                     outfile = os.path.join(os.path.dirname(model["output"]["surface"].format(str(method))),"accuracy_pc.ply")
@@ -462,18 +440,17 @@ class MeshEvaluator:
             return None
 
         eval_df_full = pd.DataFrame(self.eval_dicts)
-
-        op = os.path.join(outpath, "surface_full.csv")
-        os.makedirs(os.path.join(outpath),exist_ok=True)
-        eval_df_full.to_csv(op,float_format='%.3g')
+        eval_df_class = None
 
         if group_by_class:
             eval_df_class = eval_df_full.groupby(by=['class']).mean(numeric_only=True)
-            eval_df_class.loc['mean'] = eval_df_full.mean(numeric_only=True)
-            return eval_df_full, eval_df_class
+            eval_df_class.loc["mean"] = eval_df_full.mean(numeric_only=True)
+            eval_df_full.loc["mean"] = eval_df_class.loc["mean"]
         else:
             eval_df_full.loc['mean'] = eval_df_full.mean(numeric_only=True)
-            return eval_df_full
 
+        op = os.path.join(outpath, "{}_full.csv".format(method))
+        os.makedirs(os.path.join(outpath),exist_ok=True)
+        eval_df_full.to_csv(op,float_format='%.3g')
 
-
+        return eval_df_full, eval_df_class

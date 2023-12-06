@@ -10,3 +10,4 @@ from .robust import RobustDataset
 from .thingi10k import Thingi10kDataset
 from .tanksandtemples import TanksAndTemples
 from .defects import DefectsDataset
+from .scan_settings import scan_settings

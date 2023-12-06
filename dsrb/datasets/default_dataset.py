@@ -6,68 +6,107 @@ except:
 from libmesh import check_mesh_contains
 from tqdm import tqdm
 import numpy as np
-from glob import glob
 import open3d as o3d
-from glob import glob
-from converter import Converter
 from pathlib import Path
 import matplotlib.colors as mcolors
 from copy import deepcopy
-
+import logging
+from dsrb.datasets.scan_settings import scan_settings
 
 class DefaultDataset:
 
     def __init__(self,
-                 mesh_tools_dir="/home/rsulzer/cpp/mesh-tools/build/release",
-                 poisson_exe = "/home/rsulzer/cpp/PoissonRecon/Bin/Linux/PoissonRecon",
+                 logger=None,
+                 verbosity=logging.INFO,
                  tqdm_enabled=True,
                  debug_export=False):
 
+        if logger is not None:
+            self.logger = logger
+        else:
+            self.logger = logging.getLogger("DATASET")
+            self.logger.setLevel(verbosity)
+
         data_dir_file = os.path.join(os.path.dirname(__file__),"..","..","DATA_DIR.txt")
         if not os.path.isfile(data_dir_file):
-            print("Could not find {}. Please put a file called DATA_DIR.txt in the root folder of this porject which points to your dataset directory.".format(data_dir_file))
-
+            self.logger.error("Could not find {}. Please put a file called DATA_DIR.txt with the path that points to your dataset directory in the root folder of this porject.".format(data_dir_file))
+            return 1
         with open(data_dir_file,"r") as f:
             data_dir = f.readline()
 
+        cpp_dir_file = os.path.join(os.path.dirname(__file__),"..","..","CPP_DIR.txt")
+        if not os.path.isfile(cpp_dir_file):
+            self.logger.error("Could not find {}. Please put a file called CPP_DIR.txt in the root folder of this porject which points to your cpp directory.".format(cpp_dir_file))
+        else:
+            with open(cpp_dir_file,"r") as f:
+                cpp_dir = f.readline()
+
+
         self.path = data_dir
         self.model_dicts = []
-        self.mesh_tools_dir = mesh_tools_dir
-        self.poisson_exe = poisson_exe
+        self.mesh_tools_dir = os.path.join(cpp_dir,"mesh-tools","build","release")
+        self.poisson_exe = os.path.join(cpp_dir,"PoissonRecon","Bin","Linux","PoissonRecon")
         self.debug_export = debug_export
         self.tqdm_disabled = not tqdm_enabled
 
+        self.splits = None
 
-    def scan(self,scan_setting="4",scanner_dir="/home/raphael/cpp/mesh-tools/build/release/scan",
-             normal_method='jet', normal_neighborhood=30, normal_orient=1):
+
+
+    def scan(self,scan_configuration="4"):
+        self.logger.info("Scan ground truth surface...")
+
+        scan_exe = os.path.join(self.mesh_tools_dir,"scan")
+        if not os.path.isfile(scan_exe):
+            self.logger.error("Could not find {}. Please install mesh-tools from here: https://github.com/raphaelsulzer/mesh-tools.git")
+            return 1
+
 
         if(len(self.model_dicts) < 1):
-            print("\nERROR: run getModels() first!")
-            sys.exit(1)
+            self.logger.error("run get_models() before scan().")
+            return 1
 
-        scan = scan_settings[scan_setting]
+        scan = scan_settings[scan_configuration]
 
-        for m in self.model_dicts:
+        if self.splits is None:
+            self.splits = ["default"]
+            md = {}
+            md["default"] = self.model_dicts
+            self.model_dicts = md
 
-            os.makedirs(os.path.join(self.path,"scan",m["class"]),exist_ok=True)
 
-            command = [scanner_dir,
-                       "-w", str(self.path),
-                       "-i", "mesh/1/"+m["class"]+".off",
-                       "-o", str(os.path.join("scan",m["class"],scan_setting)),
-                       "--points", scan["points"],
-                       "--noise", scan["noise"],
-                       "--outliers", scan["outliers"],
-                       "--cameras", scan["cameras"],
-                       "--normal_method", "jet",
-                       "--export", "all",
-                       "--normal_neighborhood", normal_neighborhood,
-                       "--normal_method", normal_method,
-                       "--normal_orient", normal_orient]
-            print(*command)
-            p = subprocess.Popen(command)
-            p.wait()
+        for s in self.splits:
+            models = self.model_dicts[s]
+            for model in tqdm(models,ncols=50):
 
+                try:
+                    os.makedirs(os.path.dirname(model["scan"]),exist_ok=True)
+
+                    command = [str(scan_exe),
+                               "-i", str(model["mesh"]),
+                               "-o", str(model["scan"][:-4]),
+                               "--points", scan["points"],
+                               "--noise", scan["noise"],
+                               "--outliers", scan["outliers"],
+                               "--cameras", scan["cameras"],
+                               "--normal_neighborhood", "30",
+                               "--normal_method", "jet",
+                               "--normal_orientation", "1",
+                               "--export", "all",
+                               "-e","n"]
+                    if self.logger.level < 20:
+                        print(*command)
+                        p = subprocess.Popen(command)
+                    else:
+                        p = subprocess.Popen(command,stdout=subprocess.DEVNULL)
+                    p.wait()
+
+                    os.makedirs(os.path.dirname(model["scan_ply"]),exist_ok=True)
+                    os.rename(model["scan"].replace(".npz",".ply"),model["scan_ply"])
+                except Exception as e:
+                    # raise e
+                    print(e)
+                    print("Skipping {}/{}".format(model["class"], model["model"]))
 
     def sample(self,n_points=1000000,overwrite=True):
 
@@ -234,40 +273,12 @@ class DefaultDataset:
             os.makedirs(os.path.dirname(outfile),exist_ok=True)
             o3d.io.write_triangle_mesh(outfile,mesh)
 
-
-
-    def convert(self):
-
-        for m in tqdm(self.model_dicts):
-            pcd = o3d.io.read_point_cloud(str(Path(m["eval"]["pointcloud"]).with_suffix(".ply")))
-            np.savez(str(Path(m["eval"]["pointcloud"]).with_suffix(".npz")), points=np.asarray(pcd.points), normals=np.asarray(pcd.normals))
-
-    def convert_mesh(self):
-
-        for m in tqdm(self.model_dicts):
-            plymesh = str(Path(m["mesh"]).with_suffix(".ply"))
-            mesh = o3d.io.read_triangle_mesh(plymesh)
-            o3d.io.write_triangle_mesh(m["mesh"],mesh)
-
-    def move(self):
-
-        for m in self.model_dicts:
-
-            # inp = os.path.dirname(m["pointcloud"])
-            # out = os.path.join(os.path.dirname(m["pointcloud"]),"..","eval_unit")
-            # shutil.copytree(inp,out)
-            infile = m["qem"]["partition"].format("None").replace("qem","coacd")
-            outfile = m["coacd"]["partition"]
-            os.rename(infile,outfile)
-            os.rmdir(os.path.dirname(infile))
-
-
-
     def make_eval(self,n_points=100000,unit=False,surface=True,occ=True):
-        print("Sample points on surface and in bounding box for evaluation...\n")
+        self.logger.info("Sample points on ground truth surface and in bounding box for evaluation...")
+
         if(len(self.model_dicts) < 1):
-            print("\nERROR: run get_models() first!")
-            sys.exit(1)
+            self.logger.error("run get_models() first!")
+            return 1
         for m in tqdm(self.model_dicts):
 
             try:

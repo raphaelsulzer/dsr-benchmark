@@ -1,4 +1,5 @@
 import os
+import shutil
 import time
 import pandas as pd
 import open3d as o3d
@@ -75,6 +76,15 @@ class Thingi10kDataset(DefaultDataset):
             self.model_dicts.append(d)
 
         return self.model_dicts
+
+
+    def clean(self):
+
+        for model in self.model_dicts:
+
+            if os.path.isdir(os.path.join(model["path"],"compod")):
+                shutil.rmtree(os.path.join(model["path"],"compod"))
+            a=5
 
 
     def stl2off(self):
@@ -188,7 +198,8 @@ if __name__ == '__main__':
     ds.get_models()
     # ds.rename()
 
-    ds.setup_lists()
+    ds.clean()
+
 
     # ds.make_eval()
     # ds.sample()

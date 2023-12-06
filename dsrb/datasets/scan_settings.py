@@ -8,8 +8,9 @@ scan_settings["4"]["outliers"] = "0.0"
 scan_settings["4"]["cameras"] = "10"
 
 scan_settings["43"] = scan_settings["4"]
+scan_settings["mvs"] = scan_settings["4"]
 
-
+# unused
 scan_settings["5"] = dict()
 scan_settings["5"]["points"] = "10000"
 scan_settings["5"]["noise"] = "0.025"

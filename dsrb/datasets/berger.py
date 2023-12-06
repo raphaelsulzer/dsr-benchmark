@@ -14,24 +14,23 @@ from .default_dataset import DefaultDataset
 DEBUG = 1
 class Berger(DefaultDataset):
 
-    def __init__(self,classes=[]):
+    def __init__(self,path=None,classes=[]):
         super().__init__()
-        self.path = os.path.join(self.path,"reconbench")
+        if path is not None:
+            self.path = path
+        else:
+            self.path = os.path.join(self.path,"reconbench")
         
         self.classes = classes if isinstance(classes,list) else [classes]
 
 
-        if not classes:
-            with open(os.path.join(self.path, "classes.lst"), 'r') as f:
-                categories = f.read().split('\n')
-            if '' in categories:
-                categories.remove('')
-            self.classes = categories
+        if not len(classes):
+            self.classes = ["anchor","daratech","dc","gargoyle","lordquas"]
 
-    def get_models(self,scan_conf=["0","1","2","3","4"],hint=None):
+    def get_models(self,scan_configuration=["0","1","2","3","4"],hint=None):
 
 
-        self.scan_conf = scan_conf if isinstance(scan_conf, list) else [scan_conf]
+        self.scan_conf = scan_configuration if isinstance(scan_configuration, list) else [scan_configuration]
 
         for s in self.scan_conf:
             for c in self.classes:
@@ -43,15 +42,11 @@ class Berger(DefaultDataset):
                 d = {}
                 d["class"] = s
                 d["model"] = c
-                d["n_sample_points"] = 150000
                 d["scan_conf"] = s
                 d["path"] = self.path
-                if "mvs" in s:
-                    d["scan"] = os.path.join(self.path,"scan",c,s[3:]+".npz")
-                    d["scan_ply"] = os.path.join(self.path,"scan",c,s[3:]+".ply")
-                else:
-                    d["scan"] = os.path.join(self.path,"scan","{}_{}.npz".format(c,s))
-                    d["scan_ply"] = os.path.join(self.path,"scan",c,s+".ply")
+
+                d["scan"] = os.path.join(self.path,"scan","{}_{}.npz".format(c,s))
+                d["scan_ply"] = os.path.join(self.path,"scan_ply","with_normals","{}_{}.ply".format(c,s))
 
                 d["convex_hull"] = os.path.join(self.path,"p2m","convex_hull",s,c+".obj")
                 d["poisson_6"] = os.path.join(self.path,"p2m","poisson",s,c+".ply")
@@ -59,74 +54,26 @@ class Berger(DefaultDataset):
                 d["eval"] = dict()
                 d["eval"]["occ"] = os.path.join(self.path,"eval",c,"points.npz")
                 d["eval"]["pointcloud"] = os.path.join(self.path,"eval",c,"pointcloud.npz")
-                d["eval"]["polygons"] = os.path.join(self.path,"eval",c,"polygon_samples.npz")
 
-                # d["pointcloud_ply"] = os.path.join(self.path,"scan_ply","with_normals",c+"_"+s+".ply")
-                d["pointcloud_ply"] = str(Path(d["eval"]["pointcloud"]).with_suffix(".ply"))
+                d["pointcloud_ply"] = d["eval"]["pointcloud"].replace(".npz",".ply")
 
-                d["mesh"] = os.path.join(self.path,"mesh",c+"_light.off")
+                d["mesh"] = os.path.join(self.path,"mesh","{}.off".format(c))
 
                 d["planes"] = os.path.join(self.path,"planes",c,s,"planes.npz")
                 d["plane_params"] = os.path.join(self.path,"planes",c,s,"params.txt")
-                d["ransac"] = os.path.join(self.path,"ransac",c,s,"planes.npz")
 
-                # d["partition"] = os.path.join(self.path,'{}','{}',c,s,"partition.ply")
-                # d["compact_surface"] = os.path.join(self.path,'{}','{}',c,s,"surface.off")
-                d["ksr"] = {}
-                d["ksr"]["surface"] = os.path.join(self.path,"ksr",'{}','{}',c,s,"surface.off")
-                d["ksr"]["partition"] = os.path.join(self.path,"ksr",'{}','{}',c,s,"partition.ply")
-
-                d["abspy"] = {}
-                d["abspy"]["surface"] = os.path.join(self.path,"abspy",'{}','{}',c,s,"surface.obj")
-                d["abspy"]["partition"] = os.path.join(self.path,"abspy",'{}','{}',c,s,"partition.ply")
-
-                d["coacd"] = {}
-                d["coacd"]["partition"] = os.path.join(self.path,"coacd",c,s,"in_cells.ply")
-                d["coacd"]["surface"] = os.path.join(self.path,"coacd",c,s,"in_cells.ply")
-
-                d["qem"] = {}
-                d["qem"]["partition"] = os.path.join(self.path,"qem",'{}',c,s,"in_cells.ply")
-                d["qem"]["surface"] = os.path.join(self.path,"qem",'{}',c,s,"surface.off")
+                d["output"] = {}
+                d["output"]["surface"] = os.path.join(self.path,'{}',c,s,"surface.obj")
+                d["output"]["surface_simplified"] = os.path.join(self.path,'{}',c,s,"surface_simplified.obj")
+                d["output"]["partition"] = os.path.join(self.path,'{}',c,s,"partition.ply")
+                d["output"]["partition_pickle"] = os.path.join(self.path,'{}',c,s,"partition")
 
                 self.model_dicts.append(d)
 
         return self.model_dicts
 
 
-
-    def scan(self,scan_setting="4",scanner_dir="/home/raphael/cpp/mesh-tools/build/release/scan",
-             normal_method='jet', normal_neighborhood=30, normal_orient=1):
-
-        if(len(self.model_dicts) < 1):
-            print("\nERROR: run get_models() first!")
-            sys.exit(1)
-
-        scan = scan_settings[scan_setting]
-
-        for m in self.model_dicts:
-
-            os.makedirs(os.path.join(self.path,"scan",m["class"]),exist_ok=True)
-
-            command = [scanner_dir,
-                       "-w", str(self.path),
-                       "-i", "mesh/1/"+m["class"]+".off",
-                       "-o", str(os.path.join("scan",m["class"],scan_setting)),
-                       "--points", scan["points"],
-                       "--noise", scan["noise"],
-                       "--outliers", scan["outliers"],
-                       "--cameras", scan["cameras"],
-                       "--normal_method", "jet",
-                       "--export", "all",
-                       "--normal_neighborhood", normal_neighborhood,
-                       "--normal_method", normal_method,
-                       "--normal_orient", normal_orient]
-            print(*command)
-            p = subprocess.Popen(command)
-            p.wait()
-
-
-
-    def scanBerger(self,args):
+    def scan_berger(self,args):
         import configparser
 
         # make the scans

@@ -8,13 +8,11 @@ from default_dataset import DefaultDataset
 
 class ShapeNet(DefaultDataset):
 
-    def __init__(self,path="/home/rsulzer/data/ShapeNet",
-                 classes=[],
-                 mesh_tools_dir="/home/raphael/cpp/mesh-tools/build/release"):
+    def __init__(self,
+                 classes=[]):
         super().__init__()
 
-        self.path = path
-        self.mesh_tools_dir = mesh_tools_dir
+        self.path = os.path.join(self.path,"ShapeNet")
         self.classes = classes
         self.model_dicts = {}
 
@@ -56,41 +54,43 @@ class ShapeNet(DefaultDataset):
                     temp.append(self.metadata[c])
             self.classes = temp
 
-
-    # def setup(self):
-    #
-    #     for c in self.classes:
-    #
-    #         models = os.listdir(os.path.join(self.path,c))
-    #
-    #         for m in models:
-    #             # try:
-    #
-    #             infile = os.path.join(self.path,c,m,"mesh.off")
-    #             if not os.path.isfile(infile):
-    #                 continue
-    #             os.makedirs(os.path.join(self.path,c,m,"mesh"),exist_ok=True)
-    #             outfile = os.path.join(self.path,c,m,"mesh","mesh.off")
-    #             os.rename(infile,outfile)
-
+    def clear(self):
+        self.model_dicts = {}
 
     def setup(self):
 
-        """Move models from classX/4_watertight_scaled/modelX.off to classX/modelX/mesh/mesh.off"""
 
         for split in self.model_dicts.keys():
 
             for model in tqdm(self.model_dicts[split]):
 
-                print("Process model {}/{}".format(model["class"], model["model"]))
-
+                # print("Process model {}/{}".format(model["class"], model["model"]))
+                
+                ### Move pointcloud.npz and points.npz to eval/
                 try:
+                    os.makedirs(os.path.join(self.path,model["class"],model["model"],"eval"))
 
+                    infile = os.path.join(self.path,model["class"],model["model"],"pointcloud.npz")
+                    outfile = os.path.join(self.path,model["class"],model["model"],"eval","pointcloud.npz")
+                    os.rename(infile,outfile)
+
+                    infile = os.path.join(self.path,model["class"],model["model"],"points.npz")
+                    outfile = os.path.join(self.path,model["class"],model["model"],"eval","points.npz")
+                    os.rename(infile,outfile)
+
+
+                except Exception as e:
+                    # raise e
+                    print("Problem with model {}/{}".format(model["class"],model["model"]))
+                    print(e)
+                
+                ### Move models from classX/4_watertight_scaled/modelX.off to classX/modelX/mesh/mesh.off
+                try:
                     infile = os.path.join(self.path,model["class"],"4_watertight_scaled","{}.off".format(model["model"]))
                     if not os.path.isfile(infile):
                         continue
                     outfile = os.path.join(self.path,model["class"],model["model"],"mesh","mesh.off")
-                    if not os.path.isdir(self.path,model["class"],model["model"]):
+                    if not os.path.isdir(os.path.join(self.path,model["class"],model["model"])):
                         continue
                     os.makedirs(os.path.join(self.path,model["class"],model["model"],"mesh"))
                     os.rename(infile,outfile)
@@ -111,9 +111,19 @@ class ShapeNet(DefaultDataset):
 
             np.savetxt(os.path.join("/home/rsulzer/data/ShapeNet",cl,"bspnet.lst"),models,fmt="%s")
 
+    def make_split(self,input_split="train",output_split="debug",reduce=3):
+
+        for c in self.classes:
+
+            split_file = os.path.join(self.path, c,'{}.lst'.format(input_split))
+            with open(split_file, 'r') as f:
+                models = f.read().split('\n')
+
+            models = models[:reduce]
+            np.savetxt(os.path.join(self.path, c,'{}.lst'.format(output_split)),models,fmt="%s")
 
 
-    def get_models(self,splits=["train","val","test"],scan_conf="4",reduce=None,names=None):
+    def get_models(self,splits=["train","val","test"],scan_configuration="4",reduce=None,names=None):
         
         self.scan_conf = scan_conf
         self.splits = splits
@@ -156,8 +166,8 @@ class ShapeNet(DefaultDataset):
 
             self.model_dicts[s] = class_list
 
-        if len(splits) == 1:
-            self.model_dicts = self.model_dicts[splits[0]]
+        # if len(splits) == 1:
+        #     self.model_dicts = self.model_dicts[splits[0]]
         return self.model_dicts
 
 
@@ -217,43 +227,18 @@ class ShapeNet(DefaultDataset):
                     print(e)
                     print("Skipping {}/{}".format(m["class"], m["model"]))
 
-    def scan(self,scan_setting="4"):
 
-        if(len(self.model_dicts) < 1):
-            print("\nERROR: run get_models() first!")
-            sys.exit(1)
-
-        scan = scan_settings[scan_setting]
-
-        for s in self.splits:
-            models = self.model_dicts[s]
-            for m in tqdm(models,ncols=50):
-
-                os.makedirs(os.path.join(self.path,m["class"],m["model"],"scan"),exist_ok=True)
-
-                command = [str(os.path.join(self.mesh_tools_dir,"scan")),
-                           "-w", str(self.path),
-                           "-i", str(os.path.join(m["class"],m["model"],"mesh","mesh.off")),
-                           "-o", str(os.path.join(m["class"],m["model"],"scan",scan_setting)),
-                           "--points", scan["points"],
-                           "--noise", scan["noise"],
-                           "--outliers", scan["outliers"],
-                           "--cameras", scan["cameras"],
-                           "--normal_method", "jet",
-                           "--export", "all"]
-                print(*command)
-                p = subprocess.Popen(command)
-                p.wait()
 
 if __name__ == '__main__':
 
 
     ds = ShapeNet()
 
-    ds.get_models(names=["a6d282a360621055614d73f24792753f"])
+    # ds.get_models(names=["a691eee4545ce2fade94aad0562ac2e"])
 
-    ds.setup()
+    # ds.get_models(splits=["train"])
 
+    ds.make_split()
 
 
 
