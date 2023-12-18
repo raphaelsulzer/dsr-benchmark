@@ -474,7 +474,8 @@ class RenderReal:
 if __name__ == '__main__':
 
 
-    exp = {"real":{"models":["Ignatius","scan1","scan6","templeRing","Truck"]}}
+    # exp = {"real":{"models":["Ignatius","scan1","scan6","templeRing","Truck"]}}
+    exp = {"real":{"models":["scan6","templeRing","Truck"]}}
     exp.update(learning_dataset)
     exp.update(figures_dataset)
 
@@ -484,15 +485,15 @@ if __name__ == '__main__':
     rr.remove_model = True
 
     # experiments = ["shapenet","shapenet10000","shapenet3000","reconbench","modelnet"]
-    experiments = ["Ignatius"]
+    # experiments = ["Ignatius"]
     for e in experiments:
         models = exp[e]["models"]
-        outpath = os.path.join("/home/rsulzer/overleaf/SurveyAndBenchmark/figures/", e)
+        outpath = os.path.join("/home/rsulzer/overleaf/SurveyAndBenchmark/figures_new/", e)
         for model in models:
             os.makedirs(os.path.join(outpath,model),exist_ok=True)
 
             # path = "/home/rsulzer/data/real_out/paper/models"
-            path = os.path.join("/home/rsulzer/data/benchmark/",e)
+            path = os.path.join("/home/rsulzer/data/SurveyAndBenchmarK/",e)
             inpath = os.path.join(path,model)
             methods = glob(inpath+"/*.ply")
 
