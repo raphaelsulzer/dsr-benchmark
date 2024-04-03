@@ -5,10 +5,10 @@ from dsrb import DefaultDataset
 
 class RobustDataset(DefaultDataset):
 
-    def __init__(self,path="/home/rsulzer/data/RobustLowPolyDataSet/Thingi10k", **kwargs):
-        super().__init__(path, **kwargs)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
-        self.path = path
+        self.path = os.path.join(self.path,"RobustLowPolyDataSet","Thingi10k")
         self.model_dicts = []
 
 
@@ -19,6 +19,7 @@ class RobustDataset(DefaultDataset):
 
             d = dict()
             d["mesh"] = os.path.join(self.path, "input_repaired", "{}.off".format(i))
+            # d["mesh"] = os.path.join(self.path, "input", "{}.obj".format(i))
             if not os.path.isfile(d["mesh"]):
                 continue
             d["class"] = ""
@@ -35,6 +36,7 @@ class RobustDataset(DefaultDataset):
             d["output"] = {}
             d["output"]["surface"] = os.path.join(self.path,"output", "{"+params+"}", "{}", "surface", "{}.obj".format(i))
             d["output"]["surface_simplified"] = os.path.join(self.path, "output","{"+params+"}", "{}", "surface_simplified", "{}.obj".format(i))
+            d["output"]["surface_simplified_triangulated"] = os.path.join(self.path, "output","{"+params+"}", "{}", "surface_simplified_triangulated", "{}.obj".format(i))
             d["output"]["partition"] = os.path.join(self.path, "output","{"+params+"}", "{}", "partition", str(i) ,"partition.ply")
             d["output"]["partition_pickle"] = os.path.join(self.path, "output","{"+params+"}", "{}", "partition", str(i))
             d["output"]["in_cells"] = os.path.join(self.path, "output", "{"+params+"}", "{}", "in_cells", "{}.ply".format(i))
@@ -48,7 +50,7 @@ class RobustDataset(DefaultDataset):
                 if str(names) == model["model"]:
                     temp.append(model)
 
-        model_dicts = temp
+            model_dicts = temp
         if reduce is not None:
             model_dicts = model_dicts[:reduce]
 
@@ -65,6 +67,8 @@ class RobustDataset(DefaultDataset):
 if __name__ == '__main__':
 
     ds = RobustDataset()
-    ds.get_models(names=7)
+    ds.get_models()
 
-    ds.sample(n_points=4000000)
+    ds.make_eval()
+
+    # ds.sample(n_points=4000000)

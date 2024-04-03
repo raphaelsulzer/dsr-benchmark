@@ -1,6 +1,7 @@
 from PIL import Image, ImageDraw
 from glob import glob
 import os
+import numpy as np
 
 def png2jpg(infile,outfile):
 
@@ -11,17 +12,32 @@ def png2jpg(infile,outfile):
 
     bg.paste(im, (0, 0), im)
     # Save the resulting image
-    bg.save(outfile, subsampling=0, quality=100)
+
+    # bg = bg.resize((int(bg.size[0]/2),int(bg.size[1]/2)))
+
+    bg.save(outfile, subsampling=0, quality=90, optimize=True)
 
 
 if __name__ == "__main__":
 
-    # inpath = "/home/rsulzer/data/SurveyAndBenchmark/images/shapenet10000/02691156/d18592d9615b01bbbc0909d98a1ff2b4/"
-    # outpath = "/home/rsulzer/data/SurveyAndBenchmark/images/shapenet10000/02691156/d18592d9615b01bbbc0909d98a1ff2b4_jpg/"
+    inpath = "/home/rsulzer/data/SurveyAndBenchmark/images/defects/"
+    outpath = "/home/rsulzer/data/SurveyAndBenchmark/images/defects_jpg/"
+
+    # inpath = "/home/rsulzer/data/SurveyAndBenchmark/images/survey/"
+    # outpath = "/home/rsulzer/data/SurveyAndBenchmark/images/survey_jpg/"
+
+    # inpath = "/home/rsulzer/data/SurveyAndBenchmark/images/ignatius/"
+    # outpath = "/home/rsulzer/data/SurveyAndBenchmark/images/ignatius_jpg/"
+
+    # inpath = "/home/rsulzer/data/SurveyAndBenchmark/images/shapenet3000/02691156/d18592d9615b01bbbc0909d98a1ff2b4/"
+    # outpath = "/home/rsulzer/data/SurveyAndBenchmark/images/shapenet3000/02691156/d18592d9615b01bbbc0909d98a1ff2b4_jpg/"
+
+    # inpath = "/home/rsulzer/data/SurveyAndBenchmark/images/shapenet/02691156/d18592d9615b01bbbc0909d98a1ff2b4/"
+    # outpath = "/home/rsulzer/data/SurveyAndBenchmark/images/shapenet/02691156/d18592d9615b01bbbc0909d98a1ff2b4_jpg/"
 
     # inpath = "/home/rsulzer/data/SurveyAndBenchmark/images/modelnet/bed/0585/"
     # outpath = "/home/rsulzer/data/SurveyAndBenchmark/images/modelnet/bed/0585_jpg/"
-
+    #
     # inpath = "/home/rsulzer/data/SurveyAndBenchmark/images/reconbench/daratech/daratech/"
     # outpath = "/home/rsulzer/data/SurveyAndBenchmark/images/reconbench/daratech/daratech_jpg/"
 
@@ -40,8 +56,8 @@ if __name__ == "__main__":
     # inpath = "/home/rsulzer/data/SurveyAndBenchmark/images/exp/dc/dc/"
     # outpath = "/home/rsulzer/data/SurveyAndBenchmark/images/exp/dc/dc_jpg/"
 
-    inpath = "/home/rsulzer/data/SurveyAndBenchmark/images/exp/table/0008/"
-    outpath = "/home/rsulzer/data/SurveyAndBenchmark/images/exp/table/0008_jpg/"
+    # inpath = "/home/rsulzer/data/SurveyAndBenchmark/images/exp/table/0008/"
+    # outpath = "/home/rsulzer/data/SurveyAndBenchmark/images/exp/table/0008_jpg/"
 
     # inpath = "/home/rsulzer/data/SurveyAndBenchmark/images/exp/table/0470/"
     # outpath = "/home/rsulzer/data/SurveyAndBenchmark/images/exp/table/0470_jpg/"

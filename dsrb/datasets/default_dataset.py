@@ -10,7 +10,6 @@ from pathlib import Path
 import matplotlib.colors as mcolors
 from copy import deepcopy
 
-from libmesh import check_mesh_contains
 from dsrb.scan_settings import scan_settings
 from dsrb.logger import make_dsrb_logger
 
@@ -217,9 +216,9 @@ class DefaultDataset:
                 if keep_largest_component_only:
                     self.keep_largest_components_only(m["mesh"][:-4]+".ply")
 
-                mesh = o3d.io.read_triangle_mesh(m["mesh"][:-4]+".ply")
-                o3d.io.write_triangle_mesh(m["mesh"],mesh)
-                os.remove(m["mesh"][:-4]+".ply")
+                # mesh = o3d.io.read_triangle_mesh(m["mesh"][:-4]+".ply")
+                # o3d.io.write_triangle_mesh(m["mesh"],mesh)
+                # os.remove(m["mesh"][:-4]+".ply")
 
             except Exception as e:
                 print(e)
@@ -278,6 +277,9 @@ class DefaultDataset:
             o3d.io.write_triangle_mesh(outfile,mesh)
 
     def make_eval(self,n_points=100000,unit=False,surface=True,occ=True):
+
+        from libmesh import check_mesh_contains
+
         self.logger.info("Sample points on ground truth surface and in bounding box for evaluation...")
 
         if(len(self.model_dicts) < 1):
@@ -351,7 +353,7 @@ class DefaultDataset:
                         o3d.io.write_point_cloud(str(Path(m["eval"]["occ"]).with_suffix(".ply")), pcd)
 
             except Exception as e:
-                raise e
+                # raise e
                 print(e)
                 print("Problem with {}".format(m["model"]))
 
@@ -495,6 +497,7 @@ class DefaultDataset:
 
             pc = o3d.io.read_point_cloud(model["pointcloud_ply"])
             np.savez_compressed(model["pointcloud"],points=np.asarray(pc.points),normals=np.asarray(pc.normals))
+
 
 
     def keep_largest_components_only(self,infile):

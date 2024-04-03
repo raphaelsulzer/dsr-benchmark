@@ -8,6 +8,14 @@ import open3d as o3d
 from libmesh import check_mesh_contains
 from dsrb.logger import make_dsrb_logger
 
+from pycompose import pdse
+
+# from pymeshregiongrowing import libMRG as mrg
+
+# silent vtk logs from vedo: https://stackoverflow.com/a/71524504
+import vtk # vtk does not load if pymeshlab is already loaded. simply load pymeshlab before and there is no issue
+vtk.vtkLogger.SetStderrVerbosity(vtk.vtkLogger.VERBOSITY_OFF)
+
 class MeshEvaluator:
     ''' Mesh evaluation class.
 
@@ -130,7 +138,7 @@ class MeshEvaluator:
 
 
 
-    def eval_mesh(self, mesh, pointcloud_tgt, normals_tgt,
+    def eval_geometry(self, mesh, pointcloud_tgt, normals_tgt,
                   points_iou=None, occ_tgt=None):
         ''' Evaluates a mesh.
 
@@ -159,22 +167,28 @@ class MeshEvaluator:
         out_dict = self.eval_pointcloud(
             pointcloud, pointcloud_tgt, normals, normals_tgt)
 
+        if points_iou is not None:
+            occ = check_mesh_contains(mesh, points_iou)
+            out_dict['iou'] = self.compute_iou(occ, occ_tgt)
 
-        # components =
-        out_dict["components"] = mesh.body_count
+        return out_dict
+
+    def eval_topology(self, mesh):
+
+        out_dict = {}
+        ps = pdse(0)
 
         if len(mesh.vertices) != 0 and len(mesh.faces) != 0:
             o3dmesh = mesh.as_open3d
+
+            out_dict["components"] = mesh.body_count
 
             if(o3dmesh.is_edge_manifold(allow_boundary_edges=False)):
                 out_dict['boundary_edges'] = 0
                 out_dict['non-manifold_edges'] = 0
                 out_dict['watertight'] = 1
-                if occ_tgt is not None:
-                    occ = check_mesh_contains(mesh, points_iou)
-                    out_dict['iou'] = self.compute_iou(occ, occ_tgt)
-                else:
-                    out_dict['iou'] = -99
+                out_dict['intersection-free'] = ps.is_mesh_intersection_free(mesh.infile)
+
                 return  out_dict
 
             out_dict['boundary_edges'] = np.asarray(o3dmesh.get_non_manifold_edges(allow_boundary_edges=False)).shape[0]
@@ -187,21 +201,16 @@ class MeshEvaluator:
                 out_dict['iou'] = 0.0
             else:
                 out_dict['watertight'] = 1
-                if occ_tgt is not None:
-                    occ = check_mesh_contains(mesh, points_iou)
-                    out_dict['iou'] = self.compute_iou(occ, occ_tgt)
-                else:
-                    out_dict["iou"] = -99
-
-            # out_dict['boundary_edges'] = out_dict['boundary_edges'].shape[0]
-            # out_dict['non-manifold_edges'] = out_dict['non-manifold_edges'].shape[0]
-
         else:
-            self.logger.warning("Non valid mesh!!!\n")
+            self.logger.warning("Non valid mesh!\n")
             out_dict['boundary_edges'] = 0
             out_dict['non-manifold_edges'] = 0
             out_dict['watertight'] = 0
             out_dict['iou'] = 0.0
+
+        out_dict['watertight'] = ps.is_mesh_watertight(mesh.infile)
+        out_dict['intersection-free'] = ps.is_mesh_intersection_free(mesh.infile)
+
 
         return out_dict
 
@@ -311,12 +320,12 @@ class MeshEvaluator:
             'Hausdorff' : hausdorff*factor,
             'CD_gt->r': completeness_mean*factor,
             'CD_r->gt': accuracy_mean*factor,
-            'Chamfer': chamfer*factor
+            'Chamfer': chamfer*factor,
             # 'completeness': completeness_mean,
             # 'accuracy': accuracy_mean,
             # 'normals completeness': completeness_normals,
             # 'normals accuracy': accuracy_normals,
-            # 'normals': normals_correctness,
+            'Normal Consistency': normals_correctness
             # 'completeness2': completeness2,
             # 'accuracy2': accuracy2,
             # 'chamfer-L2': chamferL2,
@@ -334,9 +343,16 @@ class MeshEvaluator:
         return out_dict
 
 
-    def eval(self, models, outpath, method,
-             scale_with_diag=True,
-             group_by_class=True):
+    def eval(self, models, method,
+             outpath = None,
+             eval_geometry = True,
+             eval_topology = True,
+             scale_with_diag = True,
+             group_by_class = True,
+             count_regions = False):
+
+        if count_regions:
+            from pymeshregiongrowing import libMRG as mrg
 
         self.eval_dicts=[]
 
@@ -353,87 +369,122 @@ class MeshEvaluator:
                     self.logger.warning("{} is not a file.".format(model["output"]["surface"].format(str(method))))
                     continue
 
+                # mesh = trimesh.load(model["output"]["surface_simplified_triangulated"].format(str(method)), process=False)
                 mesh = trimesh.load(model["output"]["surface"].format(str(method)), process=False)
-
-                pointcloud = np.load(model["eval"]["pointcloud"])
-                pointcloud_tgt = pointcloud["points"]
-                normals_tgt = pointcloud["normals"]
-                if model["eval"]["occ"] is not None:
-                    points = np.load(model["eval"]["occ"])
-                    points_tgt = points['points']
-                    occ_tgt = np.unpackbits(points['occupancies'])
-                    eval_dict_mesh = self.eval_mesh(mesh, pointcloud_tgt, normals_tgt, points_tgt, occ_tgt)
-                else:
-                    eval_dict_mesh = self.eval_mesh(mesh, pointcloud_tgt, normals_tgt)
-
-
-                ## get AABB of all points to compute AABB diagonal for scaling the n_sample_points_per_area value
-                ppmin = pointcloud_tgt.min(axis=0)
-                ppmax = pointcloud_tgt.max(axis=0)
-                diag = np.linalg.norm(ppmax - ppmin, ord=2, axis=0)
-
-
-                scale_txt = "(x10^2)"
-                if scale_with_diag:
-                    scale = diag/10**2
-                else:
-                    scale = 1/10**2
 
                 md = {}
                 md["class"] = model["class"]
                 md["model"] = model["model"]
-                md["iou"] = eval_dict_mesh["iou"]
-                md["Chamfer {}".format(scale_txt)] = eval_dict_mesh["Chamfer"] / scale
-                md["CD_gt->r {}".format(scale_txt)] = eval_dict_mesh["CD_gt->r"] / scale
-                md["CD_r->gt {}".format(scale_txt)] = eval_dict_mesh["CD_r->gt"] / scale
 
-                md["Hausdorff {}".format(scale_txt)] = eval_dict_mesh["Hausdorff"] / scale
-                md["HD_gt->r {}".format(scale_txt)] = eval_dict_mesh["HD_gt->r"] / scale
-                md["HD_r->gt {}".format(scale_txt)] = eval_dict_mesh["HD_r->gt"] / scale
+                if eval_geometry:
+                    pointcloud = np.load(model["eval"]["pointcloud"])
+                    pointcloud_tgt = pointcloud["points"]
+                    normals_tgt = pointcloud["normals"]
+                    if model["eval"]["occ"] is not None:
+                        points = np.load(model["eval"]["occ"])
+                        points_tgt = points['points']
+                        occ_tgt = np.unpackbits(points['occupancies'])
+                        eval_dict_mesh = self.eval_geometry(mesh, pointcloud_tgt, normals_tgt, points_tgt, occ_tgt)
+                        md["iou"] = eval_dict_mesh["iou"]
+                    else:
+                        eval_dict_mesh = self.eval_geometry(mesh, pointcloud_tgt, normals_tgt)
 
-                md["components"] = eval_dict_mesh["components"]
-                md["boundary_edges"] = eval_dict_mesh["boundary_edges"]
-                md["non-manifold_edges"] = eval_dict_mesh["non-manifold_edges"]
-                md["watertight"] = eval_dict_mesh["watertight"]
-                md["surf_triangles"] = mesh.faces.shape[0]
-                md["surf_polygons"] = len(mesh.facets)
 
-                if "surface_simplified" in model["output"]:
+                    ## get AABB of all points to compute AABB diagonal for scaling the n_sample_points_per_area value
+                    ppmin = pointcloud_tgt.min(axis=0)
+                    ppmax = pointcloud_tgt.max(axis=0)
+                    diag = np.linalg.norm(ppmax - ppmin, ord=2, axis=0)
+
+
+                    scale_txt = "(x10^2)"
+                    if scale_with_diag:
+                        scale = diag/10**2
+                    else:
+                        scale = 1/10**2
+
+                    md["Chamfer {}".format(scale_txt)] = eval_dict_mesh["Chamfer"] / scale
+                    md["CD_gt->r {}".format(scale_txt)] = eval_dict_mesh["CD_gt->r"] / scale
+                    md["CD_r->gt {}".format(scale_txt)] = eval_dict_mesh["CD_r->gt"] / scale
+
+                    md["Hausdorff {}".format(scale_txt)] = eval_dict_mesh["Hausdorff"] / scale
+                    md["HD_gt->r {}".format(scale_txt)] = eval_dict_mesh["HD_gt->r"] / scale
+                    md["HD_r->gt {}".format(scale_txt)] = eval_dict_mesh["HD_r->gt"] / scale
+
+                    md["Normal Consistency"] = eval_dict_mesh["Normal Consistency"]
+
+                    if self.export_colored_eval_pointclouds:
+                        assert (eval_dict_mesh["accuracy_pointcloud"] is not None and eval_dict_mesh[
+                            "completeness_pointcloud"] is not None)
+
+                        outfile = os.path.join(os.path.dirname(model["output"]["surface"].format(str(method))),
+                                               "accuracy_pc.ply")
+                        o3d.io.write_point_cloud(outfile, eval_dict_mesh["accuracy_pointcloud"])
+
+                        outfile = os.path.join(os.path.dirname(model["output"]["surface"].format(str(method))),
+                                               "completeness_pc.ply")
+                        o3d.io.write_point_cloud(outfile, eval_dict_mesh["completeness_pointcloud"])
+
+
+                if eval_topology:
+
+                    eval_dict_mesh = self.eval_topology(mesh)
+
+                    md["components"] = eval_dict_mesh["components"]
+                    md["boundary_edges"] = eval_dict_mesh["boundary_edges"]
+                    md["non-manifold_edges"] = eval_dict_mesh["non-manifold_edges"]
+                    md["watertight"] = eval_dict_mesh["watertight"]
+                    md["intersection-free"] = eval_dict_mesh["intersection-free"]
+                    md["surf_triangles"] = mesh.faces.shape[0]
+                    md["surf_vertices"] = len(mesh.vertices)
+                    md["surf_edges"] = len(mesh.edges)
+
+                    if count_regions:
+                        angle_th = 5.0
+                        rg = mrg.mrg()
+                        fname = model["output"]["surface"].format(str(method))
+                        n_regions = rg.get_number_of_regions(fname,angle_th)
+                        md["surf_regions"] = n_regions
+                        rg.export_colored_mesh(fname[:-4]+"_regions.obj")
+                        del rg
+
                     if os.path.isfile(model["output"]["surface_simplified"].format(str(method))):
+                        simplified_mesh_file = model["output"]["surface_simplified"].format(str(method))
+                    elif os.path.isfile(model["output"]["surface"].format(str(method))):
+                        simplified_mesh_file = model["output"]["surface"].format(str(method))
+                    else:
+                        simplified_mesh_file = None
+
+                    if simplified_mesh_file is not None:
                         # mesh = trimesh.load(model["output"]["surface_simplified"].format(str(method)), process=False, force="mesh")
-                        mesh = vedo.load(model["output"]["surface_simplified"].format(str(method)))
+                        # md["surf_simpl_triangles"] = mesh.faces.shape[0]
+                        mesh = vedo.load(simplified_mesh_file)
                         self.logger.debug("Loading simplified surface for comlexity evaluation")
-                        md["surf_simpl_polygons"] = len(mesh.faces())
+                        md["surf_simpl_polygons"] = len(mesh.cells())
                         # md["surf_simpl_triangles"] = mesh.faces.shape[0]
                         # md["surf_simpl_polygons"] = len(mesh.facets)
+                        md["surf_simpl_vertices"] = len(mesh.vertices())
+                        md["surf_simpl_edges"] = len(mesh.edges())
 
 
-                md["in_cells"] = np.nan
-                if "planes" in model:
-                    if os.path.isfile(model["planes"].format(str(method))):
-                        md["n_planes"] = np.load(model["planes"].format(str(method)))["group_parameters"].shape[0]
+                    md["in_cells"] = np.nan
+                    if "planes" in model:
+                        if os.path.isfile(model["planes"].format(str(method))):
+                            md["n_planes"] = np.load(model["planes"].format(str(method)))["group_parameters"].shape[0]
 
-                if "n_planes" in md.keys() and "surf_simpl_polygons" in md.keys():
-                    md["plane_polygon_ratio"] = md["n_planes"]/md["surf_simpl_polygons"]
+                    if "n_planes" in md.keys() and "surf_simpl_polygons" in md.keys():
+                        md["plane_polygon_ratio"] = md["n_planes"]/md["surf_simpl_polygons"]
 
-                if "in_cells" in model["output"].keys() and os.path.isfile(model["output"]["in_cells"].format(str(method))):
-                    self.get_number_of_in_cells(model,md,method)
+                    if "in_cells" in model["output"].keys() and os.path.isfile(model["output"]["in_cells"].format(str(method))):
+                        self.get_number_of_in_cells(model,md,method)
 
                 self.eval_dicts.append(md)
 
-                if self.export_colored_eval_pointclouds:
-                    assert(eval_dict_mesh["accuracy_pointcloud"] is not None and eval_dict_mesh["completeness_pointcloud"] is not None)
 
-                    outfile = os.path.join(os.path.dirname(model["output"]["surface"].format(str(method))),"accuracy_pc.ply")
-                    o3d.io.write_point_cloud(outfile,eval_dict_mesh["accuracy_pointcloud"])
-
-                    outfile = os.path.join(os.path.dirname(model["output"]["surface"].format(str(method))),"completeness_pc.ply")
-                    o3d.io.write_point_cloud(outfile,eval_dict_mesh["completeness_pointcloud"])
 
 
             except Exception as e:
                 print(e)
-                # raise e
+                raise e
                 self.logger.error("{}".format(e))
                 self.logger.error("Skipping {}/{}".format(model["class"], model["model"]))
 
@@ -453,8 +504,9 @@ class MeshEvaluator:
         else:
             eval_df_full.loc['mean'] = eval_df_full.mean(numeric_only=True)
 
-        op = os.path.join(outpath, "{}_full.csv".format(method))
-        os.makedirs(os.path.join(outpath),exist_ok=True)
-        eval_df_full.to_csv(op,float_format='%.3g')
+        if outpath is not None:
+            op = os.path.join(outpath, "{}_full.csv".format(method))
+            os.makedirs(os.path.join(outpath),exist_ok=True)
+            eval_df_full.to_csv(op,float_format='%.3g')
 
         return eval_df_full, eval_df_class

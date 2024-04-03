@@ -2,6 +2,8 @@ import os, sys, subprocess
 import numpy as np
 from tqdm import tqdm
 from dsrb import DefaultDataset
+from dsrb.set_paths import set_paths
+set_paths("/home/rsulzer/data","/home/rsulzer/cpp")
 
 class ShapeNet(DefaultDataset):
 
@@ -97,16 +99,19 @@ class ShapeNet(DefaultDataset):
                     print(e)
 
 
-    def setup_bspnet_split(self):
+    def make_bspnet_eval_file(self,models,outfile="/home/rsulzer/python/BSP-NET-original/evaluation/myeval.txt"):
 
-        path = "/home/rsulzer/python/BSP-NET-pytorch/samples/"
+        mlist = []
 
-        classes = os.listdir(path)
-        for cl in classes:
+        for model in models:
 
-            models = os.listdir(os.path.join(path,cl))
+            mlist.append("{}/{}".format(model["class"],model["model"]))
 
-            np.savetxt(os.path.join("/home/rsulzer/data/ShapeNet",cl,"bspnet.lst"),models,fmt="%s")
+
+        np.savetxt(outfile,mlist,fmt="%s")
+
+
+
 
     def make_split(self,input_split="train",output_split="debug",reduce=3):
 
@@ -122,7 +127,7 @@ class ShapeNet(DefaultDataset):
 
     def get_models(self,splits=["train","val","test"],scan_configuration="4",reduce=None,names=None):
         
-        self.scan_conf = scan_conf
+        self.scan_conf = scan_configuration
         self.splits = splits
 
         if names is not None:
@@ -153,12 +158,21 @@ class ShapeNet(DefaultDataset):
                     d["class"] = c
                     d["model"] = m
                     d["path"] = os.path.join(self.path,c,m)
-                    d["scan"] = os.path.join(self.path,c,m,"scan",str(scan_conf)+".npz")
-                    d["scan_ply"] = os.path.join(self.path,c,m,"scan",str(scan_conf)+".ply")
+                    d["scan"] = os.path.join(self.path,c,m,"scan",str(scan_configuration)+".npz")
+                    d["scan_ply"] = os.path.join(self.path,c,m,"scan",str(scan_configuration)+".ply")
                     d["eval"] = dict()
                     d["eval"]["occ"] = os.path.join(self.path,c,m,"eval","points.npz")
                     d["eval"]["pointcloud"] = os.path.join(self.path,c,m,"eval","pointcloud.npz")
                     d["mesh"] = os.path.join(self.path,c,m,"mesh","mesh.off")
+
+                    d["output"] = {}
+                    d["output"]["surface"] = os.path.join(self.path,c, m, "{}", "surface.ply")
+                    d["output"]["surface_simplified"] = os.path.join(self.path,c, m, "{}", "surface_simplified.obj")
+                    d["output"]["partition"] = os.path.join(self.path, c,m, "{}", "partition.ply")
+                    d["output"]["partition_pickle"] = os.path.join(self.path,c, m, "{}", "partition")
+                    d["output"]["in_cells"] = os.path.join(self.path,c, m, "{}", "in_cells.ply")
+                    d["output"]["settings"] = os.path.join(self.path,c, m, "{}", "settings.yaml")
+
                     class_list.append(d)
 
             self.model_dicts[s] = class_list
@@ -232,10 +246,18 @@ if __name__ == '__main__':
     ds = ShapeNet()
 
     # ds.get_models(names=["a691eee4545ce2fade94aad0562ac2e"])
+    
+    split = "bspnet_test10"
+    ds.get_models(splits=[split])
+    # ds.model_dicts = ds.model_dicts[split]
+    #
+    # ds.make_eval()
 
-    # ds.get_models(splits=["train"])
+    # ds.make_split()
+    ds.make_bspnet_eval_file(models=ds.model_dicts[split],outfile="/home/rsulzer/python/BSP-NET-original/evaluation/{}.txt".format(split))
+    # ds.make_split(input_split="bspnet_test",output_split="bspnet_test10",reduce=10)
 
-    ds.make_split()
+
 
 
 

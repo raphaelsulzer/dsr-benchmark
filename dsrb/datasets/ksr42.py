@@ -41,6 +41,7 @@ class KSR42Dataset(DefaultDataset):
                 d = {}
                 d["class"] = c
                 d["model"] = m
+                d["path"] = os.path.join(self.path,c,m)
 
                 d["eval"] = dict()
                 d["eval"]["occ"] = os.path.join(self.path, c, m, "eval","points.npz")

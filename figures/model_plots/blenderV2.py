@@ -4,12 +4,13 @@ try:
     pydevd_pycharm.settrace('localhost', port=1090, stdoutToServer=True, stderrToServer=True)
 except:
     pass
-import bpy
+import open3d as o3d
 from pyblender import BlenderRender
 from importlib import reload
 reload(pyblender)
 from glob import glob
 import math
+import numpy as np
 
 class ThisBlenderRender(BlenderRender):
 
@@ -164,18 +165,15 @@ if __name__ == '__main__':
     inpath = "/home/rsulzer/data/SurveyAndBenchmark/"
     outpath = "/home/rsulzer/data/SurveyAndBenchmark/images/"
 
-
-    # for model in ["templeRing","scan1"]:
     experiment = "real"
     cl = ""
     model = "Truck"
     # model = "scan1"
     # model = "templeRing"
 
-
-    # experiment = "shapenet10000"
-    # cl = "02691156"
-    # model = "d18592d9615b01bbbc0909d98a1ff2b4"
+    experiment = "shapenet"
+    cl = "02691156"
+    model = "d18592d9615b01bbbc0909d98a1ff2b4"
 
     # experiment = "modelnet"
     # cl = "bed"
@@ -185,7 +183,6 @@ if __name__ == '__main__':
     # cl = "daratech"
     # model = "daratech"
 
-
     # experiment = "exp"
     # cl = "02691156"
     # model = "1bea1445065705eb37abdc1aa610476c"
@@ -194,30 +191,38 @@ if __name__ == '__main__':
     # cl = "dc"
     # model = "dc"
     #
-    experiment = "exp"
-    cl = "table"
-    model = "0008"
+    # experiment = "exp"
+    # cl = "table"
+    # model = "0008"
     #
     # experiment = "exp"
     # cl = "table"
     # model = "0470"
 
-
-
     settings = get_settings_dict(model)
     rr = True
     # rr = False
     br = ThisBlenderRender(out_path=outpath, settings=settings, render_and_remove=rr, samples=64)
-    models = glob(os.path.join(inpath, experiment, cl, model) + "/mesh.ply")
+    models = glob(os.path.join(inpath, experiment, cl, model) + "/*.ply")
 
-    br.light_files = os.path.join(outpath, experiment, cl, model, "light_file_surface.npz")
-    br.cam_file = os.path.join(outpath, experiment, cl, model, "cam_file_surface.npz")
-    br.set_camera_file_path(br.cam_file)
-    br.set_light_file_path(br.light_files)
-    br.render_pc(os.path.join(inpath,experiment, cl, model,"input3000.ply"),
-                      out_file=os.path.join(outpath, experiment,cl, model, "input3000.png"), point_size=settings["point_size"],
-                      with_color=False)
-    models = []
+    # pcd = o3d.io.read_point_cloud(os.path.join(inpath,experiment, cl, model,"input.ply"))
+    # diag = np.linalg.norm(pcd.get_min_bound() - pcd.get_max_bound())
+    # settings["light_location"] = np.array(settings["light_location"]) * diag
+
+    pcd = o3d.io.read_triangle_mesh(os.path.join(inpath,experiment, cl, model,"gt.ply"))
+    diag = np.linalg.norm(pcd.get_min_bound() - pcd.get_max_bound())
+    settings["light_location"] = np.array(settings["light_location"]) * diag
+
+
+    # br.light_files = os.path.join(outpath, experiment, cl, model, "light_file_surface.npz")
+    # br.cam_file = os.path.join(outpath, experiment, cl, model, "cam_file_surface.npz")
+    # br.set_camera_file_path(br.cam_file)
+    # br.set_light_file_path(br.light_files)
+    # br.render_pc(os.path.join(inpath,experiment, cl, model,"input.ply"),
+    #                   out_file=os.path.join(outpath, experiment,cl, model, "input3000.png"), point_size=settings["point_size"],
+    #                   with_color=False)
+    # models = []
+
     for method in models:
 
         if os.path.basename(method) == "input.ply" or os.path.basename(method) == "full.ply":
