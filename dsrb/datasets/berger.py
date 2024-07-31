@@ -7,7 +7,6 @@ from pathlib import Path
 from libmesh import check_mesh_contains
 from dsrb import DefaultDataset
 
-
 class Berger(DefaultDataset):
 
     def __init__(self,path=None,classes=[]):
@@ -23,7 +22,7 @@ class Berger(DefaultDataset):
         if not len(classes):
             self.classes = ["anchor","daratech","dc","gargoyle","lordquas"]
 
-    def get_models(self,scan_configuration=["0","1","2","3","4"],hint=None):
+    def get_models(self,scan_configuration=["0","1","2","3","4"],names=None):
 
 
         self.scan_conf = scan_configuration if isinstance(scan_configuration, list) else [scan_configuration]
@@ -31,9 +30,6 @@ class Berger(DefaultDataset):
         for s in self.scan_conf:
             for c in self.classes:
 
-                if hint is not None:
-                    if hint not in c:
-                        continue
 
                 d = {}
                 d["class"] = s
@@ -65,6 +61,14 @@ class Berger(DefaultDataset):
                 d["output"]["partition_pickle"] = os.path.join(self.path,'{}',c,s,"partition")
 
                 self.model_dicts.append(d)
+
+        temp = []
+        if names is not None:
+            for model in self.model_dicts:
+                if str(names) == model["model"]:
+                    temp.append(model)
+
+            self.model_dicts = temp
 
         return self.model_dicts
 

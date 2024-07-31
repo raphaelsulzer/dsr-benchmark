@@ -93,7 +93,7 @@ class KSR42Dataset_ori(DefaultDataset):
 
                 d["pointcloud"] = os.path.join(self.path,c,m,"pointcloud","pointcloud.npz")
                 d["pointcloud_ply"] = os.path.join(self.path,c,m,"pointcloud","pointcloud.ply")
-                d["pointcloud_lidar"] = os.path.join(self.path,c,m,"pointcloud","pointcloud_voxel_001.ply")
+                d["pointcloud_lidar"] = os.path.join(self.path,c,m,"pointcloud","pointcloud.ply")
                 pcd = o3d.io.read_point_cloud(d["pointcloud_ply"])
                 d["bb_diagonal"] = np.linalg.norm(pcd.get_min_bound() - pcd.get_max_bound())
 
@@ -123,6 +123,36 @@ class KSR42Dataset_ori(DefaultDataset):
             print("ERROR: no models found!")
             return None
         return self.model_dicts
+
+
+    def vg2npz(self,override=False):
+        from pypsdr import psdr
+        for m in tqdm(self.model_dicts):
+            try:
+                if(not os.path.isfile(m["planes"])) or override:
+                    if(not os.path.isfile(m["planes_vg"])):
+                        self.logger.error("No planes file found. {} and {} do not exist".format(m["planes"],m["planes_vg"]))
+                    self.logger.info("Convert planes file {} to .npz".format(m["planes_vg"]))
+                    ps = psdr(2)
+                    ps.load_points(m["planes_vg"])
+                    ps.detect() # have to call detect, even though the planes in the .vg file are actually used; nothing is detected newly
+                    ps.save(m["planes"])
+                    ps.save(m["planes_ply"])
+
+                    pn = ps.get_points_and_normals()
+                    pn = np.array(pn)
+                    pts = pn[:, :3]
+                    normals = pn[:,3:]
+
+                    np.savez_compressed(m["pointcloud"],points=pts,normals=normals)
+
+                    pcd = o3d.geometry.PointCloud()
+                    pcd.points = o3d.utility.Vector3dVector(pts)
+                    pcd.normals = o3d.utility.Vector3dVector(normals)
+                    o3d.io.write_point_cloud(m["pointcloud_ply"], pcd)
+            except Exception as e:
+                print("Problem with model {}/{}".format(m["class"],m["model"]))
+                print(e)
 
 
 
@@ -201,7 +231,7 @@ class KSR42Dataset_ori(DefaultDataset):
             td = {"class":m["class"],"model":m["model"]}
             os.makedirs(os.path.dirname(m["mesh"]),exist_ok=True)
             command = [self.poisson_exe,
-                       "--in", m["pointcloud_lidar"],
+                       "--in", m["pointcloud_ply"],
                        "--out", m["mesh"][:-4]+"_{}".format(depth),
                        "--depth", str(depth),
                        "--bType", str(boundary)]
@@ -224,6 +254,16 @@ class KSR42Dataset_ori(DefaultDataset):
         os.makedirs(os.path.dirname(outfile),exist_ok=True)
         df.to_csv(outfile)
 
+
+    def ply2off(self):
+
+        for m in tqdm(self.model_dicts):
+
+            # poisson can only export to ply, change it to off
+            mesh = o3d.io.read_triangle_mesh(m["mesh"][:-4]+"_9.ply")
+            o3d.io.write_triangle_mesh(m["mesh"],mesh)
+
+            a=5
 
 
 
@@ -417,13 +457,17 @@ class KSR42Dataset_ori(DefaultDataset):
 
 if __name__ == '__main__':
 
+    # ds = KSR42Dataset_ori(classes="Advanced")
     ds = KSR42Dataset_ori()
-    ds.get_models(names="Meeting_room")
+    # ds.get_models()
+    ds.get_models(names="Courthouse")
     # ds.estim_normals()
-    ds.make_poisson(depth=10)
+    # ds.make_poisson(depth=9)
+    # ds.ply2off()
+    ds.vg2npz(override=True)
     # ds.mesh_to_points()
     #
     # # ds.setup()
     #
-    # ds.detect_planes({"min_inliers": 20, "epsilon": 0.001, "normal_th": 0.88},max_seconds=3600)
+    # ds.detect_planes()
     # ds.detect_planes({"min_inliers": 30, "epsilon": 0.003, "normal_th": 0.85},max_seconds=21600)

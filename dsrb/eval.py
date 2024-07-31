@@ -1,4 +1,4 @@
-import logging, trimesh, vedo, os, sys
+import logging, trimesh, vedo, os, sys, shutil
 import numpy as np
 from scipy.spatial import cKDTree
 import pandas as pd
@@ -51,7 +51,7 @@ class MeshEvaluator:
             normals_tgt (numpy array): target normals
         '''
         kdtree = cKDTree(points_tgt)
-        dist, idx = kdtree.query(points_src) # dist is Euclidean distance, non-negative
+        dist, idx = kdtree.query(points_src,workers=8) # dist is Euclidean distance, non-negative
 
         if normals_src is not None and normals_tgt is not None:
             normals_src = \
@@ -123,19 +123,12 @@ class MeshEvaluator:
 
     def get_number_of_in_cells(self,model,md,method):
 
-        filename = model["output"]["in_cells"].format(str(method))
-        md["in_cells"] = len(vedo.load(filename).split(maxdepth=100000))
+        filename_wo_unloadable_vedo_chars = os.path.join(model["path"], "simplified_surface.obj")
+        shutil.copyfile(model["output"]["in_cells"].format(str(method)), filename_wo_unloadable_vedo_chars)
 
+        md["in_cells"] = len(vedo.load(filename_wo_unloadable_vedo_chars).split(maxdepth=100000))
 
-        # if os.path.isfile(filename):
-        #     with open(filename, 'r') as f:
-        #         f.readline()
-        #         f.readline()
-        #         md["in_cells"]= int(f.readline().split(":")[-1])
-        # else:
-        #     md["in_cells"] = -999999
-        #     # self.logger.warning("{} missing for measuring surface complexity".format(filename))
-
+        os.remove(filename_wo_unloadable_vedo_chars)
 
 
     def eval_geometry(self, mesh, pointcloud_tgt, normals_tgt,
@@ -168,6 +161,11 @@ class MeshEvaluator:
             pointcloud, pointcloud_tgt, normals, normals_tgt)
 
         if points_iou is not None:
+
+            se = pdse()
+            se.load_triangle_mesh(mesh.points,mesh.edges,mesh.faces)
+            occ = se.check_mesh_contains(points_iou)
+
             occ = check_mesh_contains(mesh, points_iou)
             out_dict['iou'] = self.compute_iou(occ, occ_tgt)
 
@@ -187,7 +185,7 @@ class MeshEvaluator:
                 out_dict['boundary_edges'] = 0
                 out_dict['non-manifold_edges'] = 0
                 out_dict['watertight'] = 1
-                out_dict['intersection-free'] = ps.is_mesh_intersection_free(mesh.infile)
+                # out_dict['intersection-free'] = ps.is_mesh_intersection_free(mesh.infile)
 
                 return  out_dict
 
@@ -208,9 +206,8 @@ class MeshEvaluator:
             out_dict['watertight'] = 0
             out_dict['iou'] = 0.0
 
-        out_dict['watertight'] = ps.is_mesh_watertight(mesh.infile)
-        out_dict['intersection-free'] = ps.is_mesh_intersection_free(mesh.infile)
-
+        # out_dict['watertight'] = ps.is_mesh_watertight(mesh.infile)
+        # out_dict['intersection-free'] = ps.is_mesh_intersection_free(mesh.infile)
 
         return out_dict
 
@@ -307,12 +304,6 @@ class MeshEvaluator:
 
         hausdorff = max(completeness_max,accuracy_max)
 
-        # F-Score
-        # F = [
-        #     2 * precision[i] * recall[i] / (precision[i] + recall[i])
-        #     for i in range(len(precision))
-        # ]
-
         factor=1
         out_dict = {
             'HD_gt->r': completeness_max*factor,
@@ -370,7 +361,8 @@ class MeshEvaluator:
                     continue
 
                 # mesh = trimesh.load(model["output"]["surface_simplified_triangulated"].format(str(method)), process=False)
-                mesh = trimesh.load(model["output"]["surface"].format(str(method)), process=False)
+                infile = model["output"]["surface"].format(str(method))
+                mesh = trimesh.load(infile, process=False)
 
                 md = {}
                 md["class"] = model["class"]
@@ -427,13 +419,15 @@ class MeshEvaluator:
 
                 if eval_topology:
 
+                    mesh.infile = infile
                     eval_dict_mesh = self.eval_topology(mesh)
 
                     md["components"] = eval_dict_mesh["components"]
                     md["boundary_edges"] = eval_dict_mesh["boundary_edges"]
                     md["non-manifold_edges"] = eval_dict_mesh["non-manifold_edges"]
-                    md["watertight"] = eval_dict_mesh["watertight"]
-                    md["intersection-free"] = eval_dict_mesh["intersection-free"]
+                    ### Problem here is that my CGAL implementation of watertight and self-intersection test only works with triangle meshes
+                    # md["watertight"] = eval_dict_mesh["watertight"]
+                    # md["intersection-free"] = eval_dict_mesh["intersection-free"]
                     md["surf_triangles"] = mesh.faces.shape[0]
                     md["surf_vertices"] = len(mesh.vertices)
                     md["surf_edges"] = len(mesh.edges)
@@ -457,13 +451,16 @@ class MeshEvaluator:
                     if simplified_mesh_file is not None:
                         # mesh = trimesh.load(model["output"]["surface_simplified"].format(str(method)), process=False, force="mesh")
                         # md["surf_simpl_triangles"] = mesh.faces.shape[0]
-                        mesh = vedo.load(simplified_mesh_file)
+                        filepath_wo_unloadable_vedo_chars = os.path.join(model["path"],"simplified_surface.obj")
+                        shutil.copyfile(simplified_mesh_file,filepath_wo_unloadable_vedo_chars)
+                        mesh = vedo.load(filepath_wo_unloadable_vedo_chars)
                         self.logger.debug("Loading simplified surface for comlexity evaluation")
                         md["surf_simpl_polygons"] = len(mesh.cells())
                         # md["surf_simpl_triangles"] = mesh.faces.shape[0]
                         # md["surf_simpl_polygons"] = len(mesh.facets)
                         md["surf_simpl_vertices"] = len(mesh.vertices())
                         md["surf_simpl_edges"] = len(mesh.edges())
+                        os.remove(filepath_wo_unloadable_vedo_chars)
 
 
                     md["in_cells"] = np.nan
@@ -484,7 +481,7 @@ class MeshEvaluator:
 
             except Exception as e:
                 print(e)
-                raise e
+                # raise e
                 self.logger.error("{}".format(e))
                 self.logger.error("Skipping {}/{}".format(model["class"], model["model"]))
 

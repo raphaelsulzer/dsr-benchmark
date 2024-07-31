@@ -9,6 +9,7 @@ import open3d as o3d
 from pathlib import Path
 import matplotlib.colors as mcolors
 from copy import deepcopy
+from glob import glob
 
 from dsrb.scan_settings import scan_settings
 from dsrb.logger import make_dsrb_logger
@@ -456,8 +457,28 @@ class DefaultDataset:
             pe.save_points_and_planes_from_array(plane_filename=plane_file, point_filename=pt_file, planes_array=data)
 
 
+    def load_plane_params(self, model):
 
-    def detect_planes(self,params,max_seconds=-1,max_iterations=-1):
+        path = os.path.dirname(model["planes"])
+        params_file = glob(os.path.join(path, "*params*"))[0]
+
+        with open(params_file, "r") as f:
+            lparams = f.readlines()
+
+        params = {}
+
+        params["min_inliers"] = int(lparams[3].split(":")[1])
+        params["epsilon"] = float(lparams[4].split(":")[1])
+        if "Nearest neighbors" in lparams[5]:
+            params["knn"] = int(lparams[5].split(":")[1])
+            params["normal_th"] = float(lparams[6].split(":")[1])
+        else:
+            params["knn"] = int(10)
+            params["normal_th"] = float(lparams[5].split(":")[1])
+
+        return params
+
+    def detect_planes(self,params=None,refine=False,max_seconds=-1,max_iterations=-1):
 
         try:
             from pypsdr import psdr # for importing the default_dataset in blender
@@ -469,7 +490,12 @@ class DefaultDataset:
 
             print("Process {}/{}".format(model["class"],model["model"]))
 
-            par = deepcopy(params)
+            if params is not None:
+                par = deepcopy(params)
+            else:
+                # par = self.load_plane_params(model)
+                with open(model["plane_params"],'r') as f:
+                    par = json.load(f)
             ## get bounding box diagonal
             pcd = o3d.io.read_point_cloud(model["pointcloud_ply"])
             diag = np.linalg.norm(pcd.get_min_bound() - pcd.get_max_bound())
@@ -477,18 +503,20 @@ class DefaultDataset:
             ## extract planes
             psd = psdr(1)
             psd.load_points(np.asarray(pcd.points), np.asarray(pcd.normals))
-            psd.detect(**par)
-            psd.save(model["planes"].replace(".npz","_detected.npz"))
-            psd.save(model["planes_ply"].replace(".ply","_detected.ply"))
+            # psd.detect(**par)
+            psd.detect(par["min_inliers"],par["epsilon"],par["normal_th"],par["knn"])
             # psd.set_discretization()
-            psd.refine(max_seconds=max_seconds,max_iterations=max_iterations)
+            if refine:
+                psd.save(model["planes"].replace(".npz", "_detected.npz"))
+                psd.save(model["planes_ply"].replace(".ply", "_detected.ply"))
+                psd.refine(max_seconds=max_seconds,max_iterations=max_iterations)
             psd.save(model["planes"])
             psd.save(model["planes_ply"])
 
-
-            with open(model["plane_params"], "w") as outfile:
-                # json_data refers to the above JSON
-                json.dump(params, outfile)
+            if params is not None:
+                with open(model["plane_params"], "w") as outfile:
+                    # json_data refers to the above JSON
+                    json.dump(params, outfile)
 
 
     def ply2npz(self):
