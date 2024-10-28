@@ -8,8 +8,6 @@ import open3d as o3d
 from libmesh import check_mesh_contains
 from dsrb.logger import make_dsrb_logger
 
-from pycompose import pdse
-
 # from pymeshregiongrowing import libMRG as mrg
 
 # silent vtk logs from vedo: https://stackoverflow.com/a/71524504
@@ -162,10 +160,6 @@ class MeshEvaluator:
 
         if points_iou is not None:
 
-            se = pdse()
-            se.load_triangle_mesh(mesh.points,mesh.edges,mesh.faces)
-            occ = se.check_mesh_contains(points_iou)
-
             occ = check_mesh_contains(mesh, points_iou)
             out_dict['iou'] = self.compute_iou(occ, occ_tgt)
 
@@ -174,7 +168,6 @@ class MeshEvaluator:
     def eval_topology(self, mesh):
 
         out_dict = {}
-        ps = pdse(0)
 
         if len(mesh.vertices) != 0 and len(mesh.faces) != 0:
             o3dmesh = mesh.as_open3d
