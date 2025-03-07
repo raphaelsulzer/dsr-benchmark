@@ -7,7 +7,7 @@ Data and evaluation code for the TPAMI paper **A Survey and Benchmark of Automat
 
 ## :floppy_disk: Datasets
 
-### Berget *et al*.
+### Berger *et al*.
 
 - The watertight meshes and scanned point clouds used in our paper can be downloaded [here](https://drive.google.com/file/d/18usEYyY0A1KqbVdbwu7QDA2rH-UNRdsj/view?usp=sharing).
 
