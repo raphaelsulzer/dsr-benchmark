@@ -1,8 +1,8 @@
 # A Survey and Benchmark of Automatic Surface Reconstruction from Point Clouds
 
-Data and evaluation code for the paper **A Survey and Benchmark of Automatic Surface Reconstruction from Point Clouds** ([arXiv](https://arxiv.org/abs/2301.13656)).
+Data and evaluation code for the TPAMI paper **A Survey and Benchmark of Automatic Surface Reconstruction from Point Clouds** ([arXiv](https://arxiv.org/abs/2301.13656)).
 
-![alt text](teaser.png)
+![alt text](assets/teaser_blue.png)
 
 
 ## :floppy_disk: Datasets
@@ -127,12 +127,15 @@ If you find the code or data in this repository useful, please consider citing
 
 ```bibtex
 @misc{sulzer2023dsr,
-  doi = {10.48550/ARXIV.2301.13656},
-  url = {https://arxiv.org/abs/2301.13656},
-  author = {Sulzer, Raphael and Landrieu, Loic and Marlet, Renaud and Vallet, Bruno},
-  keywords = {Computer Vision and Pattern Recognition (cs.CV), Computational Geometry (cs.CG), FOS: Computer and information sciences, FOS: Computer and information sciences},
-  title = {A Survey and Benchmark of Automatic Surface Reconstruction from Point Clouds},
-  publisher = {arXiv},
-  year = {2023},
+    author={Sulzer, Raphael and Marlet, Renaud and Vallet, Bruno and Landrieu, Loic},
+    journal={IEEE Transactions on Pattern Analysis \& Machine Intelligence},
+    title={A Survey and Benchmark of Automatic Surface Reconstruction From Point Clouds},
+    year={2025},
+    volume={47},
+    number={03},
+    ISSN={1939-3539},
+    pages={2000-2019},
+    doi={10.1109/TPAMI.2024.3510932},
+    url = {https://doi.ieeecomputersociety.org/10.1109/TPAMI.2024.3510932},
 }
 ```
