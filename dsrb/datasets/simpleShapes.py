@@ -1,5 +1,10 @@
 import os, sys, subprocess, trimesh
-from libmesh import check_mesh_contains
+
+try:
+    from libmesh import check_mesh_contains
+except Exception as e:
+    print("libmesh not found, IoU evaluation will not work.")
+
 from tqdm import tqdm
 import numpy as np
 from glob import glob

@@ -3,8 +3,11 @@ import numpy as np
 from tqdm import tqdm
 import open3d as o3d
 from pathlib import Path
-
-from libmesh import check_mesh_contains
+try:
+    from libmesh import check_mesh_contains
+except:
+    check_mesh_contains = None
+    
 from dsrb import DefaultDataset
 
 class Berger(DefaultDataset):
@@ -295,7 +298,11 @@ class Berger(DefaultDataset):
             points_surface += np.random.randn(n_points_surface, 3)
             points = np.concatenate([points_uniform, points_surface], axis=0)
 
-            occupancies = check_mesh_contains(mesh, points)
+            try:
+                occupancies = check_mesh_contains(mesh, points)
+            except Exception as e:
+                print(f"Error checking mesh contains: {e}")
+                occupancies = np.zeros(points.shape[0], dtype=bool)
 
             colors = np.zeros(shape=(n_points, 3)) + [0, 0, 1]
             colors[occupancies] = [1,0,0]

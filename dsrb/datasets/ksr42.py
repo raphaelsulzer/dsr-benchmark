@@ -4,7 +4,12 @@ import numpy as np
 from pathlib import Path
 import open3d as o3d
 
-from libmesh import check_mesh_contains
+try:
+    from libmesh import check_mesh_contains
+except Exception as e:
+    print("libmesh not found, IoU evaluation will not work.")
+    
+
 from dsrb import DefaultDataset
 from dsrb.scan_settings import scan_settings
 
