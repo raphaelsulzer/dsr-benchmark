@@ -5,7 +5,11 @@ import pandas as pd
 from tqdm import tqdm
 import open3d as o3d
 
-from libmesh import check_mesh_contains
+try:
+    from libmesh import check_mesh_contains
+except ImportError:
+    check_mesh_contains = None
+
 from dsrb.logger import make_dsrb_logger
 
 # from pymeshregiongrowing import libMRG as mrg
@@ -414,6 +418,8 @@ class MeshEvaluator:
 
                     mesh.infile = infile
                     eval_dict_mesh = self.eval_topology(mesh)
+                    
+                    
 
                     md["components"] = eval_dict_mesh["components"]
                     md["boundary_edges"] = eval_dict_mesh["boundary_edges"]
