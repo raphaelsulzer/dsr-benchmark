@@ -15,7 +15,7 @@ def test(args):
     # note that, here we do not actually use the data in data_dir, but the small sample set included in the repo
     set_paths(DATA_DIR=args.dataset_dir,CPP_DIR=args.cpp_dir)
 
-    # note necessary to provide if set_paths is called. here we override the path from set_paths
+    # not necessary to provide if set_paths is called. here we override the path from set_paths
     dataset_path = os.path.join(os.path.dirname(__file__),"reconbench")
     ds = Berger(path=dataset_path)
     models = ds.get_models(scan_configuration="mvs")
